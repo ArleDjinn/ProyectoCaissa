@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Ajedrez Recreativo">
+    <meta name="description" content="{% block meta_description %}Talleres de ajedrez recreativo para niños y familias.{% endblock %}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <title>{% block title %}Ajedrez Recreativo{% endblock %}</title>
+
+    <!-- Polo assets -->
+    <link href="{{ url_for('static', filename='css/plugins.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+<div class="body-inner">
+    <!-- Header -->
+    {% block header %}
+        <header id="header"
+                data-transparent="{{ 'true' if request.endpoint == 'core.home' else 'false' }}"
+                data-fullwidth="true"
+                class="{{ 'dark' if request.endpoint == 'core.home' else 'light' }} submenu-light">
+            <div class="header-inner">
+                <div class="container">
+                    <!-- Logo -->
+                    <div id="logo">
+                        <a href="{{ url_for('core.home') }}">
+                            <span class="logo-default">Ajedrez Recreativo</span>
+                            <span class="logo-dark">Ajedrez Recreativo</span>
+                        </a>
+                    </div>
+
+                    <!-- Header extras -->
+                    {% block header_extras %}
+                    <div class="header-extras">
+                        <ul>
+                            {# Aquí podrías poner iconos o buscador en el futuro #}
+                        </ul>
+                    </div>
+                    {% endblock %}
+
+                    <!-- Mobile trigger -->
+                    <div id="mainMenu-trigger"><a class="lines-button x"><span class="lines"></span></a></div>
+
+                    <!-- Main menu -->
+                    <div id="mainMenu">
+                        <div class="container">
+                            <nav>
+                                {% block main_menu %}
+                                    <ul>
+                                        <li><a href="{{ url_for('core.home') }}">Inicio</a></li>
+                                        <li><a href="{{ url_for('core.home') }}#planes">Planes</a></li>
+                                        <li><a href="{{ url_for('core.home') }}#talleres">Talleres</a></li>
+
+                                        {% if current_user.is_authenticated and current_user.is_admin %}
+                                        <li><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+                                        <li><a href="{{ url_for('auth.logout') }}">Salir</a></li>
+                                        {% else %}
+                                        <li><a href="{{ url_for('auth.login') }}">Acceso Admin</a></li>
+                                        {% endif %}
+                                    </ul>
+                                {% endblock %}
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+    {% endblock %}
+    <!-- /Header -->
+    <!-- Hero / Slider (opcional por página) -->
+    {% block hero %}{% endblock %}
+
+    <!-- Page content -->
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="container mt-3">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'warning' if category == 'warning' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    {% block footer %}
+        <footer id="footer" class="background-grey">
+            <div class="container text-center p-t-30 p-b-30">
+                <small>&copy; {{ current_year }} Ajedrez Recreativo</small>
+            </div>
+        </footer>
+    {% endblock %}
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="{{ url_for('static', filename='js/plugins.js') }}"></script>
+<script src="{{ url_for('static', filename='js/functions.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+
+</body>
+
+</html>

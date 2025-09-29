@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Inscripción{% endblock %}
+
+{% block content %}
+<div class="container p-t-40 p-b-40">
+    <h2>Formulario de inscripción</h2>
+    <form method="post">
+        {{ form.hidden_tag() }}
+
+        <h4>Plan seleccionado</h4>
+        <p>
+            <strong>{{ plan.name }}</strong> —
+            {{ plan.max_children }} niño(s),
+            {{ plan.max_workshops_per_child }} taller(es)/semana
+        </p>
+        <input type="hidden" name="plan_id" value="{{ plan.id }}">
+
+        <h4>Datos del apoderado</h4>
+        {{ form.guardian_name.label }} {{ form.guardian_name(class="form-control") }}<br>
+        {{ form.guardian_email.label }} {{ form.guardian_email(class="form-control") }}<br>
+        {{ form.phone.label }} {{ form.phone(class="form-control") }}<br>
+        {{ form.allow_whatsapp_group() }} {{ form.allow_whatsapp_group.label }}<br>
+
+        <h4>Datos de los niños</h4>
+        {% for child_form in form.children %}
+            <div class="border p-3 mb-3">
+                <h5>Niño {{ loop.index }}</h5>
+                {{ child_form.form.name.label }} {{ child_form.form.name(class="form-control") }}<br>
+                {{ child_form.form.birthdate.label }} {{ child_form.form.birthdate(class="form-control") }}<br>
+                {{ child_form.form.knowledge_level.label }} {{ child_form.form.knowledge_level(class="form-select") }}<br>
+                {{ child_form.form.health_info.label }} {{ child_form.form.health_info(class="form-control") }}<br>
+                {{ child_form.form.allow_media() }} {{ child_form.form.allow_media.label }}<br>
+            </div>
+        {% endfor %}
+
+        <h4>Talleres disponibles</h4>
+        {% for value, label in form.workshops.choices %}
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox"
+                       name="workshops" value="{{ value }}" id="workshop{{ value }}">
+                <label class="form-check-label" for="workshop{{ value }}">
+                    {{ label }}
+                </label>
+            </div>
+        {% endfor %}
+
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="accept_reglamento" id="accept_reglamento" required>
+            <label class="form-check-label" for="accept_reglamento">
+                He leído y acepto el
+                <a href="{{ url_for('inscriptions.reglamento') }}" target="_blank">Reglamento del Taller</a>.
+            </label>
+        </div>
+
+
+        <h4>Método de pago</h4>
+        {{ form.payment_method.label }} {{ form.payment_method(class="form-select") }}<br>
+
+        {{ form.submit(class="btn btn-primary") }}
+    </form>
+</div>
+{% endblock %}

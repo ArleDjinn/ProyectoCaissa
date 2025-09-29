@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Detalle de Pago{% endblock %}
+
+{% block content %}
+    <div class="container p-t-40 p-b-40">
+        <h2>Confirmación de pago</h2>
+        <p><strong>Orden #{{ order.id }}</strong></p>
+        <p>Plan: {{ order.subscription.plan.name }}</p>
+        <p>Monto: ${{ "{:,}".format(order.amount_clp).replace(",", ".") }} CLP</p>
+        <p>Estado: {{ order.payment_status.value }}</p>
+
+        <h4>Método de pago</h4>
+        {% if order.payment_method.name == "in_person" %}
+            <p>Por favor paga en persona al inicio del taller.</p>
+        {% elif order.payment_method.name == "transfer" %}
+            <p>Transfiere a la cuenta bancaria XXXX-YYYY-ZZZZ y envía comprobante.</p>
+        {% else %}
+            <p>Próximamente podrás pagar con Webpay.</p>
+        {% endif %}
+    </div>
+{% endblock %}

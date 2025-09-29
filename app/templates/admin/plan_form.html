@@ -1,0 +1,64 @@
+{# templates/admin/plan_form.html #}
+{% extends "admin/dashboard_base.html" %}
+
+{% block dashboard_content %}
+<h2 class="mb-4">
+  {% if form.name.data %}
+    ✏️ Editar plan
+  {% else %}
+    ➕ Nuevo plan
+  {% endif %}
+</h2>
+
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+
+      <div class="mb-3">
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control", placeholder="Ej. Plan Familiar") }}
+        {% if form.name.errors %}
+          <div class="text-danger small">{{ form.name.errors[0] }}</div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.max_children.label(class="form-label") }}
+        {{ form.max_children(class="form-control", placeholder="Ej. 3") }}
+        {% if form.max_children.errors %}
+          <div class="text-danger small">{{ form.max_children.errors[0] }}</div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.max_workshops_per_child.label(class="form-label") }}
+        {{ form.max_workshops_per_child(class="form-control", placeholder="Ej. 2") }}
+        {% if form.max_workshops_per_child.errors %}
+          <div class="text-danger small">{{ form.max_workshops_per_child.errors[0] }}</div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.price_monthly.label(class="form-label") }}
+        {{ form.price_monthly(class="form-control", placeholder="Ej. 25000") }}
+        {% if form.price_monthly.errors %}
+          <div class="text-danger small">{{ form.price_monthly.errors[0] }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-check mb-3">
+        {{ form.is_active(class="form-check-input") }}
+        {{ form.is_active.label(class="form-check-label") }}
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        💾 Guardar
+      </button>
+      <a href="{{ url_for('admin.list_plans') }}" class="btn btn-secondary">
+        ↩ Volver
+      </a>
+    </form>
+  </div>
+</div>
+{% endblock %}

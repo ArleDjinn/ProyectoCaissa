@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio - Ajedrez Recreativo{% endblock %}
+
+{% block hero %}
+    <div id="slider" class="inspiro-slider slider-fullscreen dots-creative" data-fade="true">
+        <div class="slide kenburns" data-bg-image="{{ url_for('static', filename='images/slider/notgeneric_bg3.jpg') }}">
+            <div class="bg-overlay light"></div>
+            <div class="container">
+                <div class="slide-captions text-center text-light">
+                    <h1 data-caption-animate="zoom-out">Bienvenidos a Ajedrez Recreativo</h1>
+                    <p>Un espacio para que niños y familias disfruten del ajedrez como una experiencia lúdica y formativa.</p>
+                    <div><a href="#planes" class="btn btn-primary scroll-to">Ver planes</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+<section id="planes" class="background-grey">
+    <div class="container">
+        <div class="heading-text heading-line text-center pb-5">
+            <h4>Planes</h4>
+        </div>
+
+        <!-- Nav tabs -->
+        <ul class="nav nav-tabs justify-content-center" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="mensual-tab" data-bs-toggle="tab" href="#mensual" role="tab">Mensual</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="trimestral-tab" data-bs-toggle="tab" href="#trimestral" role="tab">Trimestral</a>
+            </li>
+        </ul>
+
+        <!-- Tab content -->
+        <div class="tab-content p-t-30">
+            <!-- Planes mensuales -->
+            <div class="tab-pane fade show active" id="mensual" role="tabpanel">
+                <div class="row pricing-table">
+                    {% for plan in planes %}
+                        <div class="col-lg-4 col-md-12 col-12">
+                            <div class="plan">
+                                <div class="plan-header">
+                                    <h4>{{ plan.name }}</h4>
+                                    <p class="text-muted">
+                                        {{ plan.max_children }} niño(s), {{ plan.max_workshops_per_child }} taller(es)/semana
+                                    </p>
+                                    <div class="plan-price">
+                                        <sup>$</sup>{{ "{:,}".format(plan.price_monthly).replace(",", ".") }}<span>/mes</span>
+                                    </div>
+                                </div>
+                                <div class="plan-list">
+                                    <ul>
+                                        <li><i class="fa fa-user"></i>Hasta {{ plan.max_children }} niño(s)</li>
+                                        <li><i class="fa fa-chess"></i>{{ plan.max_workshops_per_child }} taller(es) por semana</li>
+                                        <li><i class="fa fa-calendar"></i>Facturación mensual</li>
+                                    </ul>
+                                    <div class="plan-button">
+                                        <a href="{{ url_for('inscriptions.inscripcion', plan_id=plan.id) }}" class="btn btn-primary">Inscribirme</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Planes trimestrales -->
+            <div class="tab-pane fade" id="trimestral" role="tabpanel">
+                <div class="row pricing-table">
+                    {% for plan in planes %}
+                        {% set discounted = plan.price_monthly * 3 * (1 - plan.quarterly_discount_pct/100) %}
+                        <div class="col-lg-4 col-md-12 col-12">
+                            <div class="plan">
+                                <div class="plan-header">
+                                    <h4>{{ plan.name }}</h4>
+                                    <p class="text-muted">
+                                        Pago trimestral con {{ plan.quarterly_discount_pct }}% de descuento
+                                    </p>
+                                    <div class="plan-price">
+                                        <sup>$</sup>{{ "{:,}".format(discounted|round|int).replace(",", ".") }}<span>/3 meses</span>
+                                    </div>
+                                </div>
+                                <div class="plan-list">
+                                    <ul>
+                                        <li><i class="fa fa-user"></i>Hasta {{ plan.max_children }} niño(s)</li>
+                                        <li><i class="fa fa-chess"></i>{{ plan.max_workshops_per_child }} taller(es) por semana</li>
+                                        <li><i class="fa fa-percent"></i>{{ plan.quarterly_discount_pct }}% descuento</li>
+                                    </ul>
+                                    <div class="plan-button">
+                                        <a href="{{ url_for('inscriptions.inscripcion', plan_id=plan.id) }}?billing=quarterly"
+                                           class="btn btn-primary">Inscribirme</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Talleres -->
+<section id="talleres">
+    <div class="container">
+        <div class="heading-text heading-section">
+            <h2>Talleres disponibles</h2>
+            <span class="lead">Horarios activos para inscribirse.</span>
+        </div>
+        <div class="row">
+            {% for w in talleres %}
+                <div class="col-lg-4">
+                    <div class="icon-box effect small clean">
+                        <h4>{{ w.name }}</h4>
+                        <p>{{ w.day_of_week.value }} - {{ w.start_time.strftime("%H:%M") }}</p>
+                        {% if w.end_time %}
+                            <p>Termina: {{ w.end_time.strftime("%H:%M") }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

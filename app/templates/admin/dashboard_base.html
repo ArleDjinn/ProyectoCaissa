@@ -1,0 +1,108 @@
+{# templates/admin/dashboard_base.html #}
+{% extends "base.html" %}
+{% block title %}Panel de administración{% endblock %}
+
+{% block content %}
+<style>
+  /* Ajustes suaves para el layout del dashboard */
+  .dashboard-sidebar {
+    min-height: 100vh;
+    border-right: 1px solid rgba(0,0,0,.075);
+  }
+  .dashboard-sidebar .nav-link.active {
+    font-weight: 600;
+    background: rgba(0,0,0,.04);
+    border-radius: .5rem;
+  }
+  @media (max-width: 767.98px) {
+    .dashboard-sidebar {
+      min-height: auto;
+    }
+  }
+</style>
+
+<div class="container-fluid">
+  <div class="row">
+    <!-- Toggle solo móvil -->
+    <div class="d-md-none d-flex justify-content-end mt-2">
+      <button class="btn btn-outline-secondary btn-sm" type="button"
+              data-bs-toggle="collapse" data-bs-target="#adminSidebar"
+              aria-controls="adminSidebar" aria-expanded="false" aria-label="Alternar navegación">
+        Menú
+      </button>
+    </div>
+
+    <!-- Sidebar -->
+    <nav id="adminSidebar"
+         class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse show dashboard-sidebar py-3">
+      <div class="position-sticky">
+        <ul class="nav flex-column gap-1 px-2">
+          <li class="nav-item">
+            <a class="nav-link d-flex justify-content-between align-items-center {% if request.endpoint == 'admin.dashboard_payments' %}active{% endif %}"
+               href="{{ url_for('admin.dashboard_payments') }}">
+              <span>💳 Pagos / Estado inscripción</span>
+              {% if pending_orders_count is defined and pending_orders_count %}
+                <span class="badge rounded-pill text-bg-danger">{{ pending_orders_count }}</span>
+              {% endif %}
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint in ['admin.list_plans','admin.new_plan','admin.edit_plan'] %}active{% endif %}"
+               href="{{ url_for('admin.list_plans') }}">
+              📑 Planes
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint in ['admin.list_workshops','admin.new_workshop','admin.edit_workshop'] %}active{% endif %}"
+               href="{{ url_for('admin.list_workshops') }}">
+              🎓 Talleres
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint in ['admin.dashboard_enrollments'] %}active{% endif %}"
+               href="{{ url_for('admin.dashboard_enrollments') }}">
+              👧 Matrículas
+            </a>
+          </li>
+        </ul>
+
+        <hr class="my-3">
+
+        <div class="px-3 small text-muted">
+          <div><strong>Usuario:</strong> {{ current_user.name }}</div>
+          {% if current_user.last_login_at %}
+            <div><strong>Último acceso:</strong> {{ current_user.last_login_at.strftime('%d-%m-%Y %H:%M') }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+
+      {# Flash messages (BS5) #}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080;">
+            {% for category, message in messages %}
+              <div class="toast align-items-center text-bg-{{ 'warning' if category=='warning' else ('danger' if category=='danger' else ('success' if category=='success' else 'info')) }} border-0 show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                  <div class="toast-body">
+                    {{ message }}
+                  </div>
+                  <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% block dashboard_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{# templates/admin/workshop_form.html #}
+{% extends "admin/dashboard_base.html" %}
+
+{% block dashboard_content %}
+<h2 class="mb-4">
+  {% if form.name.data %}
+    ✏️ Editar taller
+  {% else %}
+    ➕ Nuevo taller
+  {% endif %}
+</h2>
+
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+
+      <div class="mb-3">
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control", placeholder="Ej. Taller de Ajedrez Básico") }}
+        {% if form.name.errors %}
+          <div class="text-danger small">{{ form.name.errors[0] }}</div>
+        {% endif %}
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          {{ form.day_of_week.label(class="form-label") }}
+          {{ form.day_of_week(class="form-select") }}
+          {% if form.day_of_week.errors %}
+            <div class="text-danger small">{{ form.day_of_week.errors[0] }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-3 mb-3">
+          {{ form.start_time.label(class="form-label") }}
+          {{ form.start_time(class="form-control") }}
+          {% if form.start_time.errors %}
+            <div class="text-danger small">{{ form.start_time.errors[0] }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-3 mb-3">
+          {{ form.end_time.label(class="form-label") }}
+          {{ form.end_time(class="form-control") }}
+          {% if form.end_time.errors %}
+            <div class="text-danger small">{{ form.end_time.errors[0] }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-check mb-3">
+        {{ form.is_active(class="form-check-input") }}
+        {{ form.is_active.label(class="form-check-label") }}
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        💾 Guardar
+      </button>
+      <a href="{{ url_for('admin.list_workshops') }}" class="btn btn-secondary">
+        ↩ Volver
+      </a>
+    </form>
+  </div>
+</div>
+{% endblock %}

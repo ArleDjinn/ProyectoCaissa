@@ -1,0 +1,162 @@
+{# templates/admin/dashboard_payments.html #}
+{% extends "admin/dashboard_base.html" %}
+
+{% block dashboard_content %}
+<h2 class="mb-4">💳 Pagos y Estado de Inscripción</h2>
+
+<!-- Nuevos niños desde último login -->
+<div class="card mb-4">
+  <div class="card-header">
+    Nuevos niños desde tu último login
+  </div>
+  <div class="card-body">
+    {% if new_children %}
+      <p>Se han inscrito <strong>{{ new_children|length }}</strong> niño(s) desde {{ last_login.strftime('%d-%m-%Y %H:%M') }}:</p>
+      <ul class="list-inline mb-0">
+        {% for c in new_children %}
+          <li class="list-inline-item">
+            <span class="badge text-bg-primary">{{ c.name }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted mb-0">No hay nuevos niños desde tu último acceso.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Tabla de órdenes pendientes -->
+<div class="card">
+  <div class="card-header">
+    Órdenes de pago pendientes
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>Apoderado</th>
+            <th>Niños</th>
+            <th>Plan</th>
+            <th class="text-center">Talleres</th>
+            <th class="text-center">Monto</th>
+            <th class="text-center">Estado</th>
+            <th class="text-center">Pago</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in pending_orders %}
+            <tr>
+              <td>
+                {{ order.subscription.guardian.user.name }}<br>
+                <small class="text-muted">{{ order.subscription.guardian.user.email }}</small><br>
+                <small class="text-muted">📞 {{ order.subscription.guardian.phone }}</small>
+              </td>
+              <td>
+                {% for c in order.subscription.guardian.children %}
+                  {{ c.name }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+              </td>
+              <td>{{ order.subscription.plan.name }}</td>
+              <td class="text-center">
+                  {% for e in order.subscription.enrollments if e.status.name == 'active' %}
+                      <div class="d-inline-block border rounded px-2 py-1 m-1" style="min-width: 120px; text-align: center;">
+                          <strong>{{ e.workshop.name }}</strong><br>
+                          <small>{{ e.workshop.day_of_week.value }} {{ e.workshop.start_time.strftime('%H:%M') }}</small>
+                      </div>
+                  {% endfor %}
+              </td>
+              <td>${{ "{:,}".format(order.amount_clp) }} {{ order.currency }}</td>
+              <td>{{ order.payment_status.value }}</td> <!--<span class="badge text-bg-warning">{{ order.payment_status.value }}</span>-->
+              <td class="text-center">
+                <form action="{{ url_for('orders.confirm_payment', order_id=order.id) }}"
+                      method="post" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-success btn-sm">Confirmar</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">
+                No hay órdenes pendientes de pago.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Tabla de órdenes pagadas -->
+<div class="card mt-4">
+  <div class="card-header">
+    Órdenes pagadas
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>Apoderado</th>
+            <th>Niños</th>
+            <th>Plan</th>
+            <th class="text-center">Talleres</th>
+            <th class="text-center">Monto</th>
+            <th class="text-center">Método</th>
+            <th class="text-center">Estado</th>
+            <th class="text-center">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in paid_orders %}
+            <tr>
+              <td>
+                {{ order.subscription.guardian.user.name }}<br>
+                <small class="text-muted">{{ order.subscription.guardian.user.email }}</small><br>
+                <small class="text-muted">📞 {{ order.subscription.guardian.phone }}</small>
+              </td>
+              <td>
+                {% for c in order.subscription.guardian.children %}
+                  {{ c.name }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+              </td>
+              <td>{{ order.subscription.plan.name }}</td>
+              <td class="text-center">
+                {% for e in order.subscription.enrollments if e.status.name == 'active' %}
+                  <div class="d-inline-block border rounded px-2 py-1 m-1" style="min-width: 120px; text-align: center;">
+                    <strong>{{ e.workshop.name }}</strong><br>
+                    <small>{{ e.workshop.day_of_week.value }} {{ e.workshop.start_time.strftime('%H:%M') }}</small>
+                  </div>
+                {% endfor %}
+              </td>
+              <td class="text-center">
+                ${{ "{:,}".format(order.amount_clp) }} {{ order.currency }}
+              </td>
+              <td class="text-center">{{ order.payment_method.value }}</td>
+              <td class="text-center">
+                <span class="badge bg-success">{{ order.payment_status.value }}</span>
+              </td>
+              <td class="text-center">
+                <form action="{{ url_for('orders.revert_payment', order_id=order.id) }}"
+                      method="post" class="d-inline"
+                      onsubmit="return confirm('¿Revertir el pago?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-warning btn-sm">Revertir</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">
+                No hay órdenes pagadas registradas.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
