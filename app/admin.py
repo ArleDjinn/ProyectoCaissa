@@ -17,6 +17,13 @@ from .extensions import db
 
 bp = Blueprint("admin", __name__, template_folder="templates")
 
+@bp.before_request
+def ensure_admin_permissions():
+    if not current_user.is_authenticated:
+        return None
+    if not current_user.is_admin:
+        flash("No tienes permisos para acceder a esta sección.", "warning")
+        return redirect(url_for("core.home"))
 
 # --- Home del dashboard: redirige a Pagos por defecto ---
 @bp.route("/dashboard")
@@ -40,7 +47,7 @@ def dashboard_payments():
     return render_template(
         "admin/dashboard_payments.html",
         pending_orders=pending_orders,
-        paid_orders=paid_orders,  # 👈 nuevo
+        paid_orders=paid_orders,
         new_children=new_children,
         last_login=last_login,
     )

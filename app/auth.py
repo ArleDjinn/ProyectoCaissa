@@ -15,6 +15,10 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
+            if not user.is_admin:
+                flash("Solo el personal autorizado puede acceder al panel de administración.", "warning")
+                return redirect(url_for("core.home"))
+
             login_user(user)
             user.last_login_at = datetime.now(timezone.utc)
             db.session.commit()
