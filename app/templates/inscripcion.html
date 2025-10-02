@@ -17,7 +17,10 @@
 
         <h4>Datos del apoderado</h4>
         {{ form.guardian_name.label }} {{ form.guardian_name(class="form-control") }}<br>
-        {{ form.guardian_email.label }} {{ form.guardian_email(class="form-control") }}<br>
+        {{ form.guardian_email.label }} {{ form.guardian_email(class="form-control") }}
+        <small class="form-text text-muted d-block mb-2">
+            Al finalizar verás una contraseña temporal para acceder al portal de apoderados.
+        </small>
         {{ form.phone.label }} {{ form.phone(class="form-control") }}<br>
         {{ form.allow_whatsapp_group() }} {{ form.allow_whatsapp_group.label }}<br>
 

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Inscripción confirmada{% endblock %}
+
+{% block content %}
+<div class="container p-t-40 p-b-40">
+    <h2>¡Inscripción creada!</h2>
+    <p class="alert alert-success">
+        Guarda esta contraseña temporal (solo se mostrará una vez) para ingresar al portal cuando recibas acceso al panel:
+        <strong>{{ temporary_password }}</strong>
+    </p>
+    <p>
+        Podrás cambiarla desde el panel de apoderados. Si la pierdes, solicita un restablecimiento al equipo de Caissa.
+    </p>
+
+    <h4>Próximos pasos</h4>
+    <ul>
+        <li>Revisa tu correo <strong>{{ guardian_email }}</strong> para confirmar la inscripción.</li>
+        <li>
+            Completa el pago del plan <strong>{{ plan.name }}</strong> con facturación
+            <strong>{{ billing_cycle.value|lower }}</strong>.
+        </li>
+    </ul>
+
+    <div class="mt-4">
+        {% if payment_method.name == 'webpay' %}
+            <a class="btn btn-primary" href="{{ url_for('orders.start_webpay', order_id=order.id) }}">
+                Ir a Webpay para pagar
+            </a>
+        {% else %}
+            <a class="btn btn-primary" href="{{ url_for('orders.order_detail', order_id=order.id) }}">
+                Ver instrucciones de pago
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

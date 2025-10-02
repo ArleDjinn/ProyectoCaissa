@@ -1,6 +1,7 @@
+import secrets
 from datetime import datetime, timezone
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, flash, request
 from .forms import InscriptionForm, ChildForm
 from .models import User, Plan, Workshop, BillingCycle, PaymentMethod, KnowledgeLevel, Subscription
 from .extensions import db
@@ -45,9 +46,12 @@ def inscripcion(plan_id):
             return render_template("inscripcion.html", form=form, plan=plan, billing_cycle=billing_cycle)
 
         try:
+            # Contraseña temporal única para el nuevo usuario
+            temporary_password = secrets.token_urlsafe(12)
+
             # Crear User
             user = User(name=form.guardian_name.data, email=form.guardian_email.data)
-            user.set_password("temporal123")
+            user.set_password(temporary_password)
             db.session.add(user)
 
             # Guardian
@@ -99,13 +103,20 @@ def inscripcion(plan_id):
 
             db.session.commit()  # ✅ commit antes de redirigir
 
-            # 🚀 Si es Webpay, iniciamos el flujo
-            if method == PaymentMethod.webpay:
-                return redirect(url_for("orders.start_webpay", order_id=order.id))
+            flash(
+                "✅ Inscripción creada correctamente. Guarda tu contraseña temporal para acceder al portal.",
+                "success",
+            )
 
-            flash("✅ Inscripción creada, ahora confirma tu pago.", "success")
-            return redirect(url_for("orders.order_detail", order_id=order.id))
-
+            return render_template(
+                "inscripcion_confirmacion.html",
+                guardian_email=form.guardian_email.data,
+                plan=plan,
+                order=order,
+                billing_cycle=billing_cycle,
+                payment_method=method,
+                temporary_password=temporary_password,
+            )
 
         except (ValueError, SQLAlchemyError) as e:
             db.session.rollback()
