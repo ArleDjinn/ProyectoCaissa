@@ -14,6 +14,11 @@ class PlanForm(FlaskForm):
     max_children = IntegerField("Máx. niños", validators=[DataRequired(), NumberRange(min=1)])
     max_workshops_per_child = IntegerField("Talleres por niño", validators=[DataRequired(), NumberRange(min=1)])
     price_monthly = IntegerField("Precio mensual (CLP)", validators=[DataRequired()])
+    quarterly_discount_pct = IntegerField(
+        "Descuento trimestral (%)",
+        validators=[DataRequired(), NumberRange(min=0, max=100)],
+        default=15,
+    )
     is_active = BooleanField("Activo")
     submit = SubmitField("Guardar")
 

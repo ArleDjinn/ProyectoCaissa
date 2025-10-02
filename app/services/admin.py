@@ -12,6 +12,7 @@ def create_plan(form):
         max_children=form.max_children.data,
         max_workshops_per_child=form.max_workshops_per_child.data,
         price_monthly=form.price_monthly.data,
+        quarterly_discount_pct=form.quarterly_discount_pct.data,
         is_active=form.is_active.data,
     )
     db.session.add(plan)
@@ -25,6 +26,7 @@ def update_plan(plan, form):
     plan.max_children = form.max_children.data
     plan.max_workshops_per_child = form.max_workshops_per_child.data
     plan.price_monthly = form.price_monthly.data
+    plan.quarterly_discount_pct = form.quarterly_discount_pct.data
     plan.is_active = form.is_active.data
     return plan
 

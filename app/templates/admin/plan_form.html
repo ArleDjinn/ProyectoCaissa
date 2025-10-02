@@ -47,6 +47,21 @@
         {% endif %}
       </div>
 
+        <div class="mb-3">
+            {{ form.quarterly_discount_pct.label(class="form-label") }}
+            {{ form.quarterly_discount_pct(
+            class="form-control",
+            type="number",
+            min="0",
+            max="100",
+            step="1",
+            placeholder="Ej. 15"
+            ) }}
+            {% if form.quarterly_discount_pct.errors %}
+                <div class="text-danger small">{{ form.quarterly_discount_pct.errors[0] }}</div>
+            {% endif %}
+        </div>
+
       <div class="form-check mb-3">
         {{ form.is_active(class="form-check-input") }}
         {{ form.is_active.label(class="form-check-label") }}
