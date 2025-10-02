@@ -14,6 +14,25 @@
             <p>Por favor paga en persona al inicio del taller.</p>
         {% elif order.payment_method.name == "transfer" %}
             <p>Transfiere a la cuenta bancaria XXXX-YYYY-ZZZZ y envía comprobante.</p>
+        {% elif order.payment_method.name == "webpay" %}
+            <div class="alert alert-info" role="alert">
+                <p class="mb-2">Serás redirigido al portal oficial de Webpay para completar tu pago con tarjeta.</p>
+                <ol class="mb-3">
+                    <li>Presiona <strong>Ir a Webpay</strong> para generar un intento seguro.</li>
+                    <li>Completa los datos de tu tarjeta en la ventana de Webpay.</li>
+                    <li>Al finalizar, Webpay te devolverá automáticamente a Caissa con el resultado.</li>
+                </ol>
+                <p class="mb-0">Si necesitas reintentar (por ejemplo, si cerraste la ventana o falló el pago), puedes usar el botón nuevamente; cada clic genera un enlace nuevo y válido.</p>
+            </div>
+
+            {% if order.payment_status.name != "paid" %}
+                <a class="btn btn-primary" href="{{ url_for('orders.start_webpay', order_id=order.id) }}">
+                    Ir a Webpay
+                </a>
+                <p class="text-muted small mt-2 mb-0">El botón funciona desde navegadores o dispositivos distintos y acepta reintentos seguros.</p>
+            {% else %}
+                <p class="text-success">✅ Pago completado. No es necesario volver a iniciar Webpay.</p>
+            {% endif %}
         {% else %}
             <p>Próximamente podrás pagar con Webpay.</p>
         {% endif %}

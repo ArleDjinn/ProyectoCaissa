@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from .extensions import db
-from .models import Order, PaymentMethod
+from .models import Order, PaymentMethod, PaymentStatus
 from .services import orders as order_service
 from .services import webpay as webpay_service
 
@@ -29,6 +29,10 @@ def start_webpay(order_id):
 
     if order.payment_method != PaymentMethod.webpay:
         flash("La orden no está configurada para Webpay.", "warning")
+        return redirect(url_for("orders.order_detail", order_id=order.id))
+
+    if order.payment_status == PaymentStatus.paid:
+        flash("La orden ya fue pagada, no es necesario iniciar Webpay nuevamente.", "info")
         return redirect(url_for("orders.order_detail", order_id=order.id))
 
     # Crear transacción en Webpay
