@@ -69,11 +69,13 @@
               <td>${{ "{:,}".format(order.amount_clp) }} {{ order.currency }}</td>
               <td>{{ order.payment_status.value }}</td> <!--<span class="badge text-bg-warning">{{ order.payment_status.value }}</span>-->
               <td class="text-center">
-                <form action="{{ url_for('orders.confirm_payment', order_id=order.id) }}"
-                      method="post" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button class="btn btn-success btn-sm">Confirmar</button>
-                </form>
+                  {% if current_user.is_authenticated and current_user.is_admin %}
+                      <form action="{{ url_for('orders.confirm_payment', order_id=order.id) }}"
+                            method="post" class="d-inline">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <button class="btn btn-success btn-sm">Confirmar</button>
+                      </form>
+                  {% endif %}
               </td>
             </tr>
           {% else %}

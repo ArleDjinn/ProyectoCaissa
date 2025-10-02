@@ -6,7 +6,6 @@ from .forms import LoginForm
 from datetime import datetime, timezone
 from .extensions import db
 
-
 bp = Blueprint("auth", __name__, template_folder="templates")
 
 @bp.route("/login", methods=["GET", "POST"])

@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
-from flask_login import login_required
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask_login import login_required, current_user
 from .extensions import db
 from .models import Order, PaymentMethod
 from .services import orders as order_service
@@ -13,8 +13,11 @@ def order_detail(order_id):
     return render_template("order_detail.html", order=order)
 
 @bp.route("/pago/<int:order_id>/confirmar", methods=["POST"])
+@login_required
 def confirm_payment(order_id):
     order = Order.query.get_or_404(order_id)
+    if not current_user.is_admin:
+        abort(403)
     order_service.mark_order_paid(order)
     db.session.commit()   # ✅ commit único aquí
     flash("✅ Pago confirmado correctamente", "success")
