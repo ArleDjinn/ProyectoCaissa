@@ -47,19 +47,19 @@
             </div>
         {% endfor %}
 
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="accept_reglamento" id="accept_reglamento" required>
-            <label class="form-check-label" for="accept_reglamento">
-                He leído y acepto el
-                <a href="{{ url_for('inscriptions.reglamento') }}" target="_blank">Reglamento del Taller</a>.
-            </label>
-        </div>
-
-
         <h4>Método de pago</h4>
         {{ form.payment_method.label }} {{ form.payment_method(class="form-select") }}<br>
 
         {{ form.submit(class="btn btn-primary") }}
     </form>
+    <br>
+    <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="accept_reglamento" id="accept_reglamento" required>
+        <label class="form-check-label" for="accept_reglamento">
+            <small>He leído y acepto el
+            <a href="{{ url_for('inscriptions.reglamento') }}" target="_blank">Reglamento del Taller</a>.
+            </small>
+        </label>
+    </div>
 </div>
 {% endblock %}
