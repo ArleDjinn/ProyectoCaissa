@@ -1,8 +1,15 @@
+from pathlib import Path
+
+from dotenv import load_dotenv
 from flask import Flask
+
 from .extensions import db, migrate, csrf, login_manager
 from .models import User
 from . import admin, inscriptions, orders
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env", override=False)
+load_dotenv(BASE_DIR / "instance" / ".env", override=False)
 
 def create_app(config_class="config.Config"):
     app = Flask(__name__)
