@@ -1,7 +1,8 @@
+import json
 import secrets
 from datetime import datetime, timezone
 
-from flask import Blueprint, render_template, flash, request
+from flask import Blueprint, render_template, flash, request, session, redirect, url_for
 from .forms import InscriptionForm, ChildForm
 from .models import User, Plan, Workshop, BillingCycle, PaymentMethod, KnowledgeLevel, Subscription
 from .extensions import db
@@ -99,9 +100,29 @@ def inscripcion(plan_id):
             )
 
             order = order_service.create_order(subscription, amount, method)
+            if method == PaymentMethod.webpay:
+                order.detail = json.dumps(
+                    {
+                        "order_id": order.id,
+                        "temporary_password": temporary_password,
+                        "guardian_email": form.guardian_email.data,
+                        "plan_id": plan.id,
+                        "billing_cycle": billing_cycle.name,
+                    }
+                )
             subscription.reglamento_accepted_at = datetime.now(timezone.utc)
 
             db.session.commit()  # ✅ commit antes de redirigir
+
+            if method == PaymentMethod.webpay:
+                session["webpay_inscription"] = {
+                    "order_id": order.id,
+                    "temporary_password": temporary_password,
+                    "guardian_email": form.guardian_email.data,
+                    "plan_id": plan.id,
+                    "billing_cycle": billing_cycle.name,
+                }
+                return redirect(url_for("orders.start_webpay", order_id=order.id))
 
             flash(
                 "✅ Inscripción creada correctamente. Guarda tu contraseña temporal para acceder al portal.",
@@ -114,8 +135,9 @@ def inscripcion(plan_id):
                 plan=plan,
                 order=order,
                 billing_cycle=billing_cycle,
-                payment_method=method,
+                payment_method_name=method.name,
                 temporary_password=temporary_password,
+                webpay_authorized=False,
             )
 
         except (ValueError, SQLAlchemyError) as e:

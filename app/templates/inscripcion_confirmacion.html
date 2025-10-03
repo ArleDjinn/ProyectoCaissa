@@ -3,34 +3,42 @@
 
 {% block content %}
 <div class="container p-t-40 p-b-40">
-    <h2>¡Inscripción creada!</h2>
-    <p class="alert alert-success">
-        Guarda esta contraseña temporal (solo se mostrará una vez) para ingresar al portal cuando recibas acceso al panel:
-        <strong>{{ temporary_password }}</strong>
-    </p>
-    <p>
-        Podrás cambiarla desde el panel de apoderados. Si la pierdes, solicita un restablecimiento al equipo de Caissa.
-    </p>
+    <h2>¡Inscripción confirmada!</h2>
+
+    {% if webpay_authorized %}
+        <p class="alert alert-success">
+            Tu pago en Webpay fue autorizado correctamente. Ya tenemos tu cupo reservado en el plan
+            <strong>{{ plan.name }}</strong>.
+        </p>
+    {% else %}
+        <p class="alert alert-success">
+            Tu inscripción se registró con éxito para el plan <strong>{{ plan.name }}</strong>.
+        </p>
+    {% endif %}
+
+    {% if temporary_password %}
+        <div class="alert alert-info" role="alert">
+            Guarda esta contraseña temporal (solo se mostrará una vez) para ingresar al portal cuando recibas acceso:
+            <strong>{{ temporary_password }}</strong>
+        </div>
+        <p>
+            Podrás cambiarla desde el panel de apoderados. Si la pierdes, solicita un restablecimiento al equipo de Caissa.
+        </p>
+    {% endif %}
 
     <h4>Próximos pasos</h4>
     <ul>
-        <li>Revisa tu correo <strong>{{ guardian_email }}</strong> para confirmar la inscripción.</li>
-        <li>
-            Completa el pago del plan <strong>{{ plan.name }}</strong> con facturación
-            <strong>{{ billing_cycle.value|lower }}</strong>.
-        </li>
-    </ul>
-
-    <div class="mt-4">
-        {% if payment_method.name == 'webpay' %}
-            <a class="btn btn-primary" href="{{ url_for('orders.start_webpay', order_id=order.id) }}">
-                Ir a Webpay para pagar
-            </a>
+        <li>Revisa tu correo <strong>{{ guardian_email }}</strong> para confirmar la inscripción y recibir novedades.</li>
+        {% if payment_method_name != 'webpay' %}
+            <li>
+                Revisa la <a href="{{ url_for('orders.order_detail', order_id=order.id) }}">orden de pago #{{ order.id }}</a>
+                para completar el pago con facturación <strong>{{ billing_cycle.value|lower }}</strong>.
+            </li>
         {% else %}
-            <a class="btn btn-primary" href="{{ url_for('orders.order_detail', order_id=order.id) }}">
-                Ver instrucciones de pago
-            </a>
+            <li>
+                Te contactaremos con los próximos pasos y acceso al portal durante las próximas horas.
+            </li>
         {% endif %}
-    </div>
+    </ul>
 </div>
 {% endblock %}
