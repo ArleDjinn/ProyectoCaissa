@@ -145,6 +145,24 @@ def webpay_return():
         )
 
     order_service.mark_order_failed(order)
+
+    persisted_context = None
+    if context is not None:
+        persisted_context = context
+    elif detail_payload is not None:
+        persisted_context = detail_payload
+
+    if persisted_context is not None:
+        session["webpay_inscription"] = persisted_context
+
+        try:
+            current_detail = json.loads(order.detail) if order.detail else None
+        except (TypeError, ValueError):
+            current_detail = None
+
+        if current_detail != persisted_context:
+            order.detail = json.dumps(persisted_context)
+
     db.session.commit()
 
     error_message = resp.get("status") or resp.get("response_code")
