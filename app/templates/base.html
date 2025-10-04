@@ -54,11 +54,18 @@
                                         <li><a href="{{ url_for('core.home') }}#planes">Planes</a></li>
                                         <li><a href="{{ url_for('core.home') }}#talleres">Talleres</a></li>
 
-                                        {% if current_user.is_authenticated and current_user.is_admin %}
-                                        <li><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
-                                        <li><a href="{{ url_for('auth.logout') }}">Salir</a></li>
+                                        {% if current_user.is_authenticated %}
+                                            {% if current_user.is_admin %}
+                                                <li><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+                                                <li><a href="{{ url_for('auth.logout') }}">Salir</a></li>
+                                            {% elif current_user.guardian_profile %}
+                                                <li><a href="{{ url_for('portal.dashboard') }}">Mi Portal</a></li>
+                                                <li><a href="{{ url_for('auth.logout') }}">Salir</a></li>
+                                            {% else %}
+                                                <li><a href="{{ url_for('auth.logout') }}">Salir</a></li>
+                                            {% endif %}
                                         {% else %}
-                                        <li><a href="{{ url_for('auth.login') }}">Acceso Admin</a></li>
+                                            <li><a href="{{ url_for('auth.login') }}">Iniciar sesión</a></li>
                                         {% endif %}
                                     </ul>
                                 {% endblock %}

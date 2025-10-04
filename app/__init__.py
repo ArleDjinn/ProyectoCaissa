@@ -5,7 +5,7 @@ from flask import Flask
 
 from .extensions import db, migrate, csrf, login_manager
 from .models import User
-from . import admin, inscriptions, orders
+from . import admin, inscriptions, orders, portal
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env", override=False)
@@ -31,6 +31,7 @@ def create_app(config_class="config.Config"):
     app.register_blueprint(routes.bp)
     app.register_blueprint(auth.bp, url_prefix="/auth")
     app.register_blueprint(admin.bp, url_prefix="/admin")
+    app.register_blueprint(portal.bp, url_prefix="/portal")
     app.register_blueprint(inscriptions.bp)
     app.register_blueprint(orders.bp)
 

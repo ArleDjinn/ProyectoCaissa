@@ -1,4 +1,5 @@
 import json
+from urllib.parse import urlparse
 import sys
 from pathlib import Path
 
@@ -29,6 +30,7 @@ class TestConfig:
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = False
+
 
 @pytest.fixture
 def app():
@@ -81,6 +83,18 @@ def order_id(app):
         return order.id
 
 
+@pytest.fixture
+def guardian_credentials(app, order_id):
+    credentials = {"email": "guardian@example.com", "password": "portal-secret"}
+
+    with app.app_context():
+        user = User.query.filter_by(email=credentials["email"]).first()
+        user.set_password(credentials["password"])
+        db.session.commit()
+
+    return credentials
+
+
 def test_webpay_failure_restores_context(client, app, order_id, monkeypatch):
     failure_response = {"status": "FAILED", "response_code": -1}
     monkeypatch.setattr(webpay_service, "commit_token", lambda token: failure_response)
@@ -109,3 +123,40 @@ def test_webpay_failure_restores_context(client, app, order_id, monkeypatch):
         refreshed_order = Order.query.get(order_id)
         assert refreshed_order.payment_status == PaymentStatus.failed
         assert json.loads(refreshed_order.detail) == context
+
+
+def test_guardian_portal_rebuilds_webpay_context(client, app, order_id, guardian_credentials):
+    login_response = client.post(
+        "/auth/login",
+        data=guardian_credentials,
+        follow_redirects=False,
+    )
+
+    assert login_response.status_code == 302
+    assert urlparse(login_response.headers["Location"]).path == "/portal/"
+
+    retry_response = client.post(
+        f"/portal/ordenes/{order_id}/webpay/reintentar",
+        follow_redirects=False,
+    )
+
+    assert retry_response.status_code == 302
+    assert urlparse(retry_response.headers["Location"]).path == f"/pago/{order_id}/webpay/iniciar"
+
+    with client.session_transaction() as session_ctx:
+        context = session_ctx.get("webpay_inscription")
+
+    with app.app_context():
+        order = Order.query.get(order_id)
+        expected_context = {
+            "order_id": order.id,
+            "guardian_email": "guardian@example.com",
+            "plan_id": order.subscription.plan_id,
+            "billing_cycle": order.subscription.billing_cycle.name,
+        }
+
+    assert context == expected_context
+
+    with app.app_context():
+        refreshed_order = Order.query.get(order_id)
+        assert json.loads(refreshed_order.detail) == expected_context
