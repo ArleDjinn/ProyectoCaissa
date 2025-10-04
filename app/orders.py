@@ -1,6 +1,4 @@
 import json
-import secrets
-
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, session
 from flask_login import login_required, current_user
 from .extensions import db
@@ -115,18 +113,17 @@ def webpay_return():
             guardian_email = context.get("guardian_email") or guardian_email
             plan_id = context.get("plan_id")
             if plan_id:
-                plan = Plan.query.get(plan_id) or plan
+                plan = db.session.get(Plan, plan_id) or plan
             billing_cycle_name = context.get("billing_cycle")
             if billing_cycle_name:
                 try:
                     billing_cycle = BillingCycle[billing_cycle_name]
                 except KeyError:
                     pass
-            temporary_password = context.get("temporary_password")
-
-        if not temporary_password:
-            temporary_password = secrets.token_urlsafe(12)
-            order.subscription.guardian.user.set_password(temporary_password)
+            if "temporary_password" in context:
+                temporary_password = context.get("temporary_password")
+                if temporary_password:
+                    order.subscription.guardian.user.set_password(temporary_password)
 
         if order.detail is not None:
             order.detail = None
@@ -176,7 +173,7 @@ def webpay_return():
 
     plan = order.subscription.plan
     if context and context.get("plan_id"):
-        plan = Plan.query.get(context.get("plan_id")) or plan
+        plan = db.session.get(Plan, context.get("plan_id")) or plan
 
     return render_template(
         "webpay_error.html",
