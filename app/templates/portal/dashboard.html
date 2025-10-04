@@ -45,8 +45,7 @@
                                     </a>
                                     {% if order.payment_method.name == "webpay" and order.payment_status.name != "paid" %}
                                         <form method="post" action="{{ url_for('portal.prepare_webpay_retry', order_id=order.id) }}">
-                                            {{ csrf_token() }}
-                                            <button type="submit" class="btn btn-primary btn-sm">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">                                            <button type="submit" class="btn btn-primary btn-sm">
                                                 Reintentar Webpay
                                             </button>
                                         </form>

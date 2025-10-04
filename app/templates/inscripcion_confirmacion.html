@@ -31,7 +31,11 @@
         <li>Revisa tu correo <strong>{{ guardian_email }}</strong> para confirmar la inscripción y recibir novedades.</li>
         {% if payment_method_name != 'webpay' %}
             <li>
-                Revisa la <a href="{{ url_for('orders.order_detail', order_id=order.id) }}">orden de pago #{{ order.id }}</a>
+                {% if current_user.is_authenticated %}
+                    Revisa la <a href="{{ url_for('orders.order_detail', order_id=order.id) }}">orden de pago #{{ order.id }}</a>
+                {% else %}
+                    Inicia sesión para revisar la <a href="{{ url_for('auth.login', next=url_for('orders.order_detail', order_id=order.id)) }}">orden de pago #{{ order.id }}</a>
+                {% endif %}
                 para completar el pago con facturación <strong>{{ billing_cycle.value|lower }}</strong>.
             </li>
         {% else %}

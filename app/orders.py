@@ -9,8 +9,16 @@ from .services import webpay as webpay_service
 bp = Blueprint("orders", __name__, template_folder="templates")
 
 @bp.route("/pago/<int:order_id>")
+@login_required
 def order_detail(order_id):
     order = Order.query.get_or_404(order_id)
+    if current_user.is_admin:
+        return render_template("order_detail.html", order=order)
+    guardian_profile = getattr(current_user, "guardian_profile", None)
+    if guardian_profile is None:
+        abort(404)
+    if order.subscription.guardian_id != guardian_profile.id:
+        abort(403)
     return render_template("order_detail.html", order=order)
 
 @bp.route("/pago/<int:order_id>/confirmar", methods=["POST"])
