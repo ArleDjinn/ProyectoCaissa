@@ -17,6 +17,7 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
             login_user(user)
+            user.previous_login_at = user.last_login_at
             user.last_login_at = datetime.now(timezone.utc)
             db.session.commit()
             next_page = request.args.get("next")

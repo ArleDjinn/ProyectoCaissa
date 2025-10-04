@@ -71,6 +71,7 @@ class User(UserMixin, UtcTimestampMixin, db.Model):
     password_hash = db.Column(db.String(512), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     last_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    previous_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     guardian_profile = db.relationship(
         "Guardian",

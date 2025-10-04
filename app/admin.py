@@ -37,7 +37,11 @@ def dashboard():
 @login_required
 def dashboard_payments():
     # Nuevos niños desde el último login
-    last_login = current_user.last_login_at or current_user.created_at
+    last_login = (
+        current_user.previous_login_at
+        if current_user.previous_login_at is not None
+        else current_user.created_at
+    )
     new_children = Child.query.filter(Child.created_at > last_login).all()
 
     # Órdenes pendientes
