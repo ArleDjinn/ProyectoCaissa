@@ -100,7 +100,7 @@ def test_webpay_failure_restores_context(client, app, order_id, monkeypatch):
     monkeypatch.setattr(webpay_service, "commit_token", lambda token: failure_response)
 
     with app.app_context():
-        order = Order.query.get(order_id)
+        order = db.session.get(Order, order_id)
         context = {
             "order_id": order.id,
             "guardian_email": "guardian@example.com",
@@ -120,43 +120,38 @@ def test_webpay_failure_restores_context(client, app, order_id, monkeypatch):
         assert session_ctx["webpay_inscription"] == context
 
     with app.app_context():
-        refreshed_order = Order.query.get(order_id)
+        refreshed_order = db.session.get(Order, order_id)
         assert refreshed_order.payment_status == PaymentStatus.failed
         assert json.loads(refreshed_order.detail) == context
 
 
-def test_guardian_portal_rebuilds_webpay_context(client, app, order_id, guardian_credentials):
-    login_response = client.post(
-        "/auth/login",
-        data=guardian_credentials,
-        follow_redirects=False,
-    )
-
-    assert login_response.status_code == 302
-    assert urlparse(login_response.headers["Location"]).path == "/portal/"
-
-    retry_response = client.post(
-        f"/portal/ordenes/{order_id}/webpay/reintentar",
-        follow_redirects=False,
-    )
-
-    assert retry_response.status_code == 302
-    assert urlparse(retry_response.headers["Location"]).path == f"/pago/{order_id}/webpay/iniciar"
-
-    with client.session_transaction() as session_ctx:
-        context = session_ctx.get("webpay_inscription")
+def test_webpay_success_from_portal_keeps_existing_password(
+    client, app, order_id, monkeypatch
+):
+    success_response = {"status": "AUTHORIZED", "response_code": 0}
+    monkeypatch.setattr(webpay_service, "commit_token", lambda token: success_response)
 
     with app.app_context():
-        order = Order.query.get(order_id)
-        expected_context = {
+        order = db.session.get(Order, order_id)
+        user = order.subscription.guardian.user
+        original_password_hash = user.password_hash
+        context = {
             "order_id": order.id,
-            "guardian_email": "guardian@example.com",
-            "plan_id": order.subscription.plan_id,
+            "guardian_email": user.email,
+            "plan_id": order.subscription.plan.id,
             "billing_cycle": order.subscription.billing_cycle.name,
         }
+        token = order.external_id
 
-    assert context == expected_context
+    with client.session_transaction() as session_ctx:
+        session_ctx["webpay_inscription"] = context
+
+    response = client.post("/pago/webpay/retorno", data={"token_ws": token})
+    assert response.status_code == 200
+    assert b"Guarda esta contrase\xc3\xb1a temporal" not in response.data
 
     with app.app_context():
-        refreshed_order = Order.query.get(order_id)
-        assert json.loads(refreshed_order.detail) == expected_context
+        refreshed_order = db.session.get(Order, order_id)
+        assert refreshed_order.payment_status == PaymentStatus.paid
+        assert refreshed_order.subscription.guardian.user.password_hash == original_password_hash
+        assert refreshed_order.detail is None
