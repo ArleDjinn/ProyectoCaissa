@@ -7,10 +7,8 @@
     <p class="alert alert-warning">{{ error_message }}</p>
     <p>
         La orden <strong>#{{ order.id }}</strong> para el plan <strong>{{ plan.name }}</strong> se mantiene pendiente.
-        Puedes intentar nuevamente el pago a través de Webpay o contactar a nuestro equipo para recibir ayuda.
+        Elige un método alternativo: transferencia bancaria o pago presencial en Caissa.
     </p>
-    <a class="btn btn-primary" href="{{ url_for('orders.start_webpay', order_id=order.id) }}">
-        Reintentar con Webpay
-    </a>
+    <p class="mb-0">Si necesitas ayuda para completar el pago, escríbenos y te guiaremos en el proceso.</p>
 </div>
 {% endblock %}

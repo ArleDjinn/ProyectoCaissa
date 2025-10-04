@@ -44,6 +44,14 @@ def start_webpay(order_id):
         flash("La orden ya fue pagada, no es necesario iniciar Webpay nuevamente.", "info")
         return redirect(url_for("orders.order_detail", order_id=order.id))
 
+    if order.payment_status == PaymentStatus.failed:
+        flash(
+            "El cobro con Webpay fue rechazado anteriormente. Por favor elige transferencia"
+            " o pago presencial.",
+            "warning",
+        )
+        return redirect(url_for("orders.order_detail", order_id=order.id))
+
     pending_context = session.get("webpay_inscription")
     if (not pending_context or pending_context.get("order_id") != order.id) and order.detail:
         try:
@@ -151,22 +159,8 @@ def webpay_return():
 
     order_service.mark_order_failed(order)
 
-    persisted_context = None
-    if context is not None:
-        persisted_context = context
-    elif detail_payload is not None:
-        persisted_context = detail_payload
-
-    if persisted_context is not None:
-        session["webpay_inscription"] = persisted_context
-
-        try:
-            current_detail = json.loads(order.detail) if order.detail else None
-        except (TypeError, ValueError):
-            current_detail = None
-
-        if current_detail != persisted_context:
-            order.detail = json.dumps(persisted_context)
+    if order.detail is not None:
+        order.detail = None
 
     db.session.commit()
 

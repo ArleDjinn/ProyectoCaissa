@@ -4,8 +4,7 @@
 {% block content %}
 <div class="container p-t-40 p-b-40">
     <h2 class="mb-3">Mis pagos y órdenes</h2>
-    <p class="text-muted">Revisa el estado de tus órdenes y reintenta Webpay cuando lo necesites.</p>
-
+    <p class="text-muted">Revisa el estado de tus órdenes y sigue las instrucciones para completar el pago.</p>
     {% if orders %}
         <div class="table-responsive">
             <table class="table table-striped align-middle">
@@ -43,16 +42,9 @@
                                     <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('orders.order_detail', order_id=order.id) }}">
                                         Ver detalle
                                     </a>
-                                    {% if order.payment_method.name == "webpay" and order.payment_status.name != "paid" %}
-                                        <form method="post" action="{{ url_for('portal.prepare_webpay_retry', order_id=order.id) }}">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">                                            <button type="submit" class="btn btn-primary btn-sm">
-                                                Reintentar Webpay
-                                            </button>
-                                        </form>
-                                    {% endif %}
                                 </div>
-                                {% if order.payment_method.name == "webpay" and order.payment_status.name != "paid" and not order.detail %}
-                                    <small class="text-muted d-block mt-1">El sistema regenerará automáticamente la información antes de abrir Webpay.</small>
+                                {% if order.payment_method.name == "webpay" and order.payment_status.name == "failed" %}
+                                    <small class="text-muted d-block mt-1">El pago con Webpay fue rechazado. Elige transferencia o pago presencial para continuar.</small>
                                 {% endif %}
                             </td>
                         </tr>
