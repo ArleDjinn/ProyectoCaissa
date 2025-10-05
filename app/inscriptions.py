@@ -154,7 +154,7 @@ def inscripcion(plan_id):
             if method == PaymentMethod.webpay:
                 session["webpay_inscription"] = {
                     "order_id": order.id,
-                    "temporary_password": temporary_password,
+                    "temporary_password": placeholder_password,
                     "guardian_email": form.guardian_email.data,
                     "plan_id": plan.id,
                     "billing_cycle": billing_cycle.name,
