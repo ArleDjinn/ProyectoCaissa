@@ -274,9 +274,9 @@ def test_full_subscription_flow(client, app, admin_data):
     with app.app_context():
         subscription = db.session.get(Subscription, admin_data["subscription_id"])
         assert subscription.status == SubscriptionStatus.canceled
-        assert subscription.end_date is not None
-        for enrollment in subscription.enrollments:
-            assert enrollment.status != EnrollmentStatus.active
+        assert subscription.end_date == date.today()
+        assert all(enrollment.status != EnrollmentStatus.active for enrollment in subscription.enrollments)
+        assert any(enrollment.status == EnrollmentStatus.canceled for enrollment in subscription.enrollments)
 
     reactivate_resp = client.post(
         detail_url,
