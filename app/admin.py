@@ -1,5 +1,7 @@
 # app/admin.py
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+import math
+
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, current_app
 from flask_login import login_required, current_user
 from .forms import PlanForm, WorkshopForm
 from .services import admin as admin_service
@@ -12,8 +14,10 @@ from .models import (
     Plan,
     EnrollmentStatus,
     PaymentStatus,
+    User
 )
 from .extensions import db
+from .auth import generate_password_reset_token, send_password_reset_email
 
 bp = Blueprint("admin", __name__, template_folder="templates")
 
@@ -47,6 +51,7 @@ def dashboard_payments():
     # Órdenes pendientes
     pending_orders = Order.query.filter_by(payment_status=PaymentStatus.pending).all()
     paid_orders = Order.query.filter_by(payment_status=PaymentStatus.paid).all()
+    reset_expiration_hours = max(1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600))
 
     return render_template(
         "admin/dashboard_payments.html",
@@ -54,7 +59,27 @@ def dashboard_payments():
         paid_orders=paid_orders,
         new_children=new_children,
         last_login=last_login,
+        reset_expiration_hours=reset_expiration_hours,
     )
+
+@bp.route("/usuarios/<int:user_id>/reset-password", methods=["POST"])
+@login_required
+def trigger_password_reset(user_id):
+    user = User.query.get_or_404(user_id)
+    token = generate_password_reset_token(user)
+    user.set_password_reset_token(token)
+    db.session.commit()
+    send_password_reset_email(user, token)
+    expiration_hours = max(1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600))
+    hours_label = "hora" if expiration_hours == 1 else "horas"
+    flash(
+        f"Se envió un enlace de restablecimiento a {user.email}. Caduca en {expiration_hours} {hours_label}.",
+        "info",
+    )
+    current_app.logger.info(
+        "Admin %s solicitó restablecimiento de contraseña para %s", current_user.email, user.email
+    )
+    return redirect(request.referrer or url_for("admin.dashboard_payments"))
 
 # --- Gestión de matrículas ---
 @bp.route("/dashboard/enrollments")

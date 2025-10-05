@@ -42,6 +42,7 @@
                     <th class="text-center">Monto</th>
                     <th class="text-center">Estado</th>
                     <th class="text-center">Pago</th>
+                    <th class="text-center">Restablecer contraseña</th>
                 </tr>
                 </thead>
         <tbody>
@@ -80,11 +81,19 @@
                       </form>
                   {% endif %}
               </td>
+                <td class="text-center">
+                    <form action="{{ url_for('admin.trigger_password_reset', user_id=order.subscription.guardian.user.id) }}"
+                          method="post" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-outline-secondary btn-sm" type="submit">Enviar enlace</button>
+                    </form>
+                    <small class="text-muted d-block mt-2">Caduca en {{ reset_expiration_hours }} {{ 'hora' if reset_expiration_hours == 1 else 'horas' }}.</small>
+                </td>
             </tr>
           {% else %}
             <tr>
-              <td colspan="7" class="text-center text-muted py-4">
-                No hay órdenes pendientes de pago.
+              <td colspan="8" class="text-center text-muted py-4">
+                  No hay órdenes pendientes de pago.
               </td>
             </tr>
           {% endfor %}
@@ -96,72 +105,81 @@
 
 <!-- Tabla de órdenes pagadas -->
 <div class="card mt-4">
-  <div class="card-header">
-    Órdenes pagadas
-  </div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-striped table-hover align-middle mb-0">
-        <thead class="table-dark">
-          <tr>
-            <th>Apoderado</th>
-            <th>Niños</th>
-            <th>Plan</th>
-            <th class="text-center">Talleres</th>
-            <th class="text-center">Monto</th>
-            <th class="text-center">Método</th>
-            <th class="text-center">Estado</th>
-            <th class="text-center">Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for order in paid_orders %}
-            <tr>
-              <td>
-                {{ order.subscription.guardian.user.name }}<br>
-                <small class="text-muted">{{ order.subscription.guardian.user.email }}</small><br>
-                <small class="text-muted">📞 {{ order.subscription.guardian.phone }}</small>
-              </td>
-              <td>
-                {% for c in order.subscription.guardian.children %}
-                  {{ c.name }}{% if not loop.last %}, {% endif %}
-                {% endfor %}
-              </td>
-              <td>{{ order.subscription.plan.name }}</td>
-              <td class="text-center">
-                {% for e in order.subscription.enrollments if e.status.name == 'active' %}
-                  <div class="d-inline-block border rounded px-2 py-1 m-1" style="min-width: 120px; text-align: center;">
-                    <strong>{{ e.workshop.name }}</strong><br>
-                    <small>{{ e.workshop.day_of_week.value }} {{ e.workshop.start_time.strftime('%H:%M') }}</small>
-                  </div>
-                {% endfor %}
-              </td>
-              <td class="text-center">
-                ${{ "{:,}".format(order.amount_clp) }} {{ order.currency }}
-              </td>
-              <td class="text-center">{{ order.payment_method.value }}</td>
-              <td class="text-center">
-                <span class="badge bg-success">{{ order.payment_status.value }}</span>
-              </td>
-              <td class="text-center">
-                <form action="{{ url_for('orders.revert_payment', order_id=order.id) }}"
-                      method="post" class="d-inline"
-                      onsubmit="return confirm('¿Revertir el pago?');">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button class="btn btn-outline-warning btn-sm">Revertir</button>
-                </form>
-              </td>
-            </tr>
-          {% else %}
-            <tr>
-              <td colspan="8" class="text-center text-muted py-4">
-                No hay órdenes pagadas registradas.
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="card-header">
+        Órdenes pagadas
     </div>
-  </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-dark">
+                <tr>
+                    <th>Apoderado</th>
+                    <th>Niños</th>
+                    <th>Plan</th>
+                    <th class="text-center">Talleres</th>
+                    <th class="text-center">Monto</th>
+                    <th class="text-center">Método</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-center">Restablecer contraseña</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for order in paid_orders %}
+                    <tr>
+                        <td>
+                            {{ order.subscription.guardian.user.name }}<br>
+                            <small class="text-muted">{{ order.subscription.guardian.user.email }}</small><br>
+                            <small class="text-muted">📞 {{ order.subscription.guardian.phone }}</small>
+                        </td>
+                        <td>
+                            {% for c in order.subscription.guardian.children %}
+                                {{ c.name }}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                        </td>
+                        <td>{{ order.subscription.plan.name }}</td>
+                        <td class="text-center">
+                            {% for e in order.subscription.enrollments if e.status.name == 'active' %}
+                                <div class="d-inline-block border rounded px-2 py-1 m-1" style="min-width: 120px; text-align: center;">
+                                    <strong>{{ e.workshop.name }}</strong><br>
+                                    <small>{{ e.workshop.day_of_week.value }} {{ e.workshop.start_time.strftime('%H:%M') }}</small>
+                                </div>
+                            {% endfor %}
+                        </td>
+                        <td class="text-center">
+                            ${{ "{:,}".format(order.amount_clp) }} {{ order.currency }}
+                        </td>
+                        <td class="text-center">{{ order.payment_method.value }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-success">{{ order.payment_status.value }}</span>
+                        </td>
+                        <td class="text-center">
+                            <form action="{{ url_for('admin.trigger_password_reset', user_id=order.subscription.guardian.user.id) }}"
+                                  method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-outline-secondary btn-sm" type="submit">Enviar enlace</button>
+                            </form>
+                            <small class="text-muted d-block mt-2">Caduca en {{ reset_expiration_hours }} {{ 'hora' if reset_expiration_hours == 1 else 'horas' }}.</small>
+                        </td>
+                        <td class="text-center">
+                            <form action="{{ url_for('orders.revert_payment', order_id=order.id) }}"
+                                  method="post" class="d-inline"
+                                  onsubmit="return confirm('¿Revertir el pago?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-outline-warning btn-sm">Revertir</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No hay órdenes pagadas registradas.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}

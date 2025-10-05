@@ -88,3 +88,22 @@ class InitialPasswordForm(FlaskForm):
         ],
     )
     submit = SubmitField("Guardar contraseña")
+
+class PasswordResetRequestForm(FlaskForm):
+    email = StringField("Correo electrónico", validators=[DataRequired(), Email()])
+    submit = SubmitField("Enviar instrucciones")
+
+
+class PasswordResetForm(FlaskForm):
+    password = PasswordField(
+        "Nueva contraseña",
+        validators=[DataRequired(), Length(min=8, message="Debe tener al menos 8 caracteres.")],
+    )
+    confirm_password = PasswordField(
+        "Confirmar contraseña",
+        validators=[
+            DataRequired(),
+            EqualTo("password", message="Las contraseñas deben coincidir."),
+        ],
+    )
+    submit = SubmitField("Actualizar contraseña")
