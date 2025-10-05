@@ -25,10 +25,26 @@ class Config:
     TBK_API_KEY = os.environ.get("TBK_API_KEY")
 
     # Mail
-    MAIL_SERVER = os.environ.get("MAIL_SERVER", "localhost")
-    MAIL_PORT = int(os.environ.get("MAIL_PORT", 25))
-    MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", default=False)
-    MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", default=False)
+    _mail_provider = os.environ.get("MAIL_PROVIDER", "default").lower()
+    if _mail_provider in {"google_workspace", "gmail"}:
+        _mail_defaults = {
+            "MAIL_SERVER": "smtp.gmail.com",
+            "MAIL_PORT": 587,
+            "MAIL_USE_TLS": True,
+            "MAIL_USE_SSL": False,
+        }
+    else:
+        _mail_defaults = {
+            "MAIL_SERVER": "localhost",
+            "MAIL_PORT": 25,
+            "MAIL_USE_TLS": False,
+            "MAIL_USE_SSL": False,
+        }
+
+    MAIL_SERVER = os.environ.get("MAIL_SERVER", _mail_defaults["MAIL_SERVER"])
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", _mail_defaults["MAIL_PORT"]))
+    MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", default=_mail_defaults["MAIL_USE_TLS"])
+    MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", default=_mail_defaults["MAIL_USE_SSL"])
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.environ.get(
