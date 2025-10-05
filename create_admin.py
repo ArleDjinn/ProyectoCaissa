@@ -16,6 +16,8 @@ with app.app_context():
             is_admin=True
         )
         admin.set_password("IamBatman")
+        admin.activate()
+        admin.email_confirmed_at = datetime.now(timezone.utc)
         db.session.add(admin)
         db.session.commit()
         print("✅ Admin Batman creado correctamente.")
