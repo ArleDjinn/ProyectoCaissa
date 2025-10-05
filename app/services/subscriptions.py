@@ -29,12 +29,14 @@ def get_active_subscriptions(guardian: Guardian):
     ).all()
 
 def cancel_subscription(sub: Subscription, *, cancel_enrollments: bool = True, end_date: date | None = None):
+    from . import enrollments as enrollment_service
+
     sub.status = SubscriptionStatus.canceled
     sub.end_date = end_date or date.today()
     if cancel_enrollments:
         for enrollment in sub.enrollments:
             if enrollment.status == EnrollmentStatus.active:
-                enrollment.status = EnrollmentStatus.canceled
+                enrollment_service.cancel_enrollment(enrollment)
     return sub
 
 def activate_subscription(sub: Subscription):
