@@ -1,4 +1,3 @@
-import json
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, session
 from flask_login import login_required, current_user
 from .extensions import db
@@ -52,24 +51,6 @@ def start_webpay(order_id):
         )
         return redirect(url_for("orders.order_detail", order_id=order.id))
 
-    pending_context = session.get("webpay_inscription")
-    if (not pending_context or pending_context.get("order_id") != order.id) and order.detail:
-        try:
-            detail_payload = json.loads(order.detail)
-        except (TypeError, ValueError):
-            detail_payload = None
-        else:
-            if detail_payload and detail_payload.get("order_id") == order.id:
-                session["webpay_inscription"] = detail_payload
-                pending_context = detail_payload
-
-    if not pending_context or pending_context.get("order_id") != order.id:
-        flash(
-            "No se encontró la información necesaria para iniciar Webpay. Completa nuevamente la inscripción o contáctanos.",
-            "warning",
-        )
-        return redirect(url_for("orders.order_detail", order_id=order.id))
-
     # Crear transacción en Webpay
     token, url = webpay_service.create_for_order(order)
     order.external_id = token
@@ -106,40 +87,14 @@ def webpay_return():
     status = (resp.get("status") or "").upper()
     authorized = status == "AUTHORIZED" or resp.get("response_code") == 0
 
-    context = session.pop("webpay_inscription", None)
-    detail_payload = None
-    if order.detail:
-        try:
-            detail_payload = json.loads(order.detail)
-        except (TypeError, ValueError):
-            detail_payload = None
+    session.pop("webpay_inscription", None)
 
-    if (not context or context.get("order_id") != order.id) and detail_payload and detail_payload.get(
-            "order_id") == order.id:
-        context = detail_payload
     if authorized:
         order_service.mark_order_paid(order)
 
         guardian_email = order.subscription.guardian.user.email
         plan = order.subscription.plan
         billing_cycle = order.subscription.billing_cycle
-        temporary_password = None
-
-        if context:
-            guardian_email = context.get("guardian_email") or guardian_email
-            plan_id = context.get("plan_id")
-            if plan_id:
-                plan = db.session.get(Plan, plan_id) or plan
-            billing_cycle_name = context.get("billing_cycle")
-            if billing_cycle_name:
-                try:
-                    billing_cycle = BillingCycle[billing_cycle_name]
-                except KeyError:
-                    pass
-            if "temporary_password" in context:
-                temporary_password = context.get("temporary_password")
-                if temporary_password:
-                    order.subscription.guardian.user.set_password(temporary_password)
 
         if order.detail is not None:
             order.detail = None
@@ -153,7 +108,6 @@ def webpay_return():
             order=order,
             billing_cycle=billing_cycle,
             payment_method_name=PaymentMethod.webpay.name,
-            temporary_password=temporary_password,
             webpay_authorized=True,
         )
 
@@ -174,8 +128,6 @@ def webpay_return():
         error_message = "El pago fue rechazado o cancelado."
 
     plan = order.subscription.plan
-    if context and context.get("plan_id"):
-        plan = db.session.get(Plan, context.get("plan_id")) or plan
 
     return render_template(
         "webpay_error.html",

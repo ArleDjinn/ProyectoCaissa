@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from datetime import datetime, timezone
 
 import pytest
 
@@ -27,6 +28,10 @@ class TestConfig:
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = False
+    MAIL_SUPPRESS_SEND = True
+    MAIL_DEFAULT_SENDER = "test@example.com"
+    INITIAL_PASSWORD_TOKEN_SALT = "test-salt"
+    INITIAL_PASSWORD_TOKEN_MAX_AGE = 3600
 
 
 @pytest.fixture
@@ -58,6 +63,8 @@ def order_context(app):
 
         owner_user = User(email="owner@example.com", name="Owner", password_hash="")
         owner_user.set_password("owner-secret")
+        owner_user.activate()
+        owner_user.email_confirmed_at = datetime.now(timezone.utc)
         db.session.add(owner_user)
         db.session.flush()
 
@@ -82,6 +89,8 @@ def order_context(app):
 
         other_user = User(email="intruder@example.com", name="Intruder", password_hash="")
         other_user.set_password("intruder-secret")
+        other_user.activate()
+        other_user.email_confirmed_at = datetime.now(timezone.utc)
         db.session.add(other_user)
         db.session.flush()
 
@@ -90,6 +99,8 @@ def order_context(app):
 
         admin_user = User(email="admin@example.com", name="Admin", password_hash="", is_admin=True)
         admin_user.set_password("admin-secret")
+        admin_user.activate()
+        admin_user.email_confirmed_at = datetime.now(timezone.utc)
         db.session.add(admin_user)
 
         outsider_user = User(email="outsider@example.com", name="Outsider", password_hash="")

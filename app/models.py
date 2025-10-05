@@ -72,6 +72,9 @@ class User(UserMixin, UtcTimestampMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     last_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
     previous_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    _is_active = db.Column("is_active", db.Boolean, default=False, nullable=False)
+    email_confirmed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    password_reset_token_hash = db.Column(db.String(512), nullable=True)
 
     guardian_profile = db.relationship(
         "Guardian",
@@ -85,6 +88,26 @@ class User(UserMixin, UtcTimestampMixin, db.Model):
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+    def is_active(self):
+        return bool(self._is_active)
+
+    def activate(self):
+        self._is_active = True
+
+    def deactivate(self):
+        self._is_active = False
+
+    def set_password_reset_token(self, token: str):
+        self.password_reset_token_hash = generate_password_hash(token)
+
+    def clear_password_reset_token(self):
+        self.password_reset_token_hash = None
+
+    def verify_password_reset_token(self, token: str) -> bool:
+        if not self.password_reset_token_hash:
+            return False
+        return check_password_hash(self.password_reset_token_hash, token)
 
     def __repr__(self):
         return f"<User {self.email} admin={self.is_admin}>"

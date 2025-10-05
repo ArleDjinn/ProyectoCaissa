@@ -1,3 +1,4 @@
+flask-mail
 pytest
 alembic==1.16.5
 amqp==5.3.1

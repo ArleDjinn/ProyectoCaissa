@@ -1,7 +1,19 @@
 from flask_wtf import FlaskForm
-from wtforms import Form, StringField, PasswordField, IntegerField, BooleanField, TimeField, SelectField, SubmitField, SelectMultipleField, FieldList, FormField
+from wtforms import (
+    Form,
+    StringField,
+    PasswordField,
+    IntegerField,
+    BooleanField,
+    TimeField,
+    SelectField,
+    SubmitField,
+    SelectMultipleField,
+    FieldList,
+    FormField,
+)
 from wtforms.fields import DateField
-from wtforms.validators import DataRequired, Email, NumberRange, Optional
+from wtforms.validators import DataRequired, Email, NumberRange, Optional, EqualTo, Length
 from .models import DayOfWeek, KnowledgeLevel, PaymentMethod
 
 class LoginForm(FlaskForm):
@@ -62,3 +74,17 @@ class InscriptionForm(FlaskForm):
     workshops = SelectMultipleField("Talleres", coerce=int, validators=[DataRequired()])
 
     submit = SubmitField("Inscribir")
+
+class InitialPasswordForm(FlaskForm):
+    password = PasswordField(
+        "Nueva contraseña",
+        validators=[DataRequired(), Length(min=8, message="Debe tener al menos 8 caracteres.")],
+    )
+    confirm_password = PasswordField(
+        "Confirmar contraseña",
+        validators=[
+            DataRequired(),
+            EqualTo("password", message="Las contraseñas deben coincidir."),
+        ],
+    )
+    submit = SubmitField("Guardar contraseña")

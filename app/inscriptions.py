@@ -1,19 +1,60 @@
-import json
 import secrets
 from datetime import datetime, timezone
-
-from flask import Blueprint, render_template, flash, request, session, redirect, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from .forms import InscriptionForm, ChildForm
 from .models import User, Plan, Workshop, BillingCycle, PaymentMethod, KnowledgeLevel, Subscription
-from .extensions import db
+from .extensions import db, mail
 from .services import guardians as guardian_service
 from .services import subscriptions as subscription_service
 from .services import enrollments as enrollment_service
 from .services import orders as order_service
 from sqlalchemy.exc import SQLAlchemyError
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Message
 
 bp = Blueprint("inscriptions", __name__, template_folder="templates")
 
+def _get_serializer() -> URLSafeTimedSerializer:
+    secret_key = current_app.config["SECRET_KEY"]
+    salt = current_app.config["INITIAL_PASSWORD_TOKEN_SALT"]
+    return URLSafeTimedSerializer(secret_key, salt=salt)
+
+def _generate_initial_password_token(user: User) -> str:
+    serializer = _get_serializer()
+    return serializer.dumps({"user_id": user.id, "purpose": "initial-password"})
+
+def send_initial_password_email(user: User, token: str, plan: Plan):
+    confirm_url = url_for("auth.confirm_initial_password", token=token, _external=True)
+    max_age = current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"]
+    expiration_hours = max(1, max_age // 3600)
+    msg = Message(
+        subject="Confirma tu acceso a Proyecto Caissa",
+        recipients=[user.email],
+    )
+    msg.body = render_template(
+        "emails/initial_password.txt",
+        user=user,
+        plan=plan,
+        confirm_url=confirm_url,
+        expiration_hours=expiration_hours,
+    )
+    msg.html = render_template(
+        "emails/initial_password.html",
+        user=user,
+        plan=plan,
+        confirm_url=confirm_url,
+        expiration_hours=expiration_hours,
+    )
+    mail.send(msg)
 
 @bp.route("/inscripcion/<int:plan_id>", methods=["GET", "POST"])
 def inscripcion(plan_id):
@@ -47,13 +88,17 @@ def inscripcion(plan_id):
             return render_template("inscripcion.html", form=form, plan=plan, billing_cycle=billing_cycle)
 
         try:
-            # Contraseña temporal única para el nuevo usuario
-            temporary_password = secrets.token_urlsafe(12)
+            # Crear User inactivo hasta confirmar
+            placeholder_password = secrets.token_urlsafe(32)
 
-            # Crear User
             user = User(name=form.guardian_name.data, email=form.guardian_email.data)
-            user.set_password(temporary_password)
+            user.set_password(placeholder_password)
+            user.deactivate()
             db.session.add(user)
+            db.session.flush()
+
+            token = _generate_initial_password_token(user)
+            user.set_password_reset_token(token)
 
             # Guardian
             guardian = guardian_service.create_guardian(
@@ -100,19 +145,11 @@ def inscripcion(plan_id):
             )
 
             order = order_service.create_order(subscription, amount, method)
-            if method == PaymentMethod.webpay:
-                order.detail = json.dumps(
-                    {
-                        "order_id": order.id,
-                        "temporary_password": temporary_password,
-                        "guardian_email": form.guardian_email.data,
-                        "plan_id": plan.id,
-                        "billing_cycle": billing_cycle.name,
-                    }
-                )
             subscription.reglamento_accepted_at = datetime.now(timezone.utc)
 
             db.session.commit()  # ✅ commit antes de redirigir
+
+            send_initial_password_email(user, token, plan)
 
             if method == PaymentMethod.webpay:
                 session["webpay_inscription"] = {
@@ -125,7 +162,7 @@ def inscripcion(plan_id):
                 return redirect(url_for("orders.start_webpay", order_id=order.id))
 
             flash(
-                "✅ Inscripción creada correctamente. Guarda tu contraseña temporal para acceder al portal.",
+                "✅ Inscripción creada correctamente. Revisa tu correo para confirmar la cuenta y definir tu contraseña.",
                 "success",
             )
 
@@ -136,7 +173,6 @@ def inscripcion(plan_id):
                 order=order,
                 billing_cycle=billing_cycle,
                 payment_method_name=method.name,
-                temporary_password=temporary_password,
                 webpay_authorized=False,
             )
 

@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from datetime import datetime, timezone
 
 import pytest
 
@@ -19,7 +20,10 @@ class TestConfig:
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = False
-
+    MAIL_SUPPRESS_SEND = True
+    MAIL_DEFAULT_SENDER = "test@example.com"
+    INITIAL_PASSWORD_TOKEN_SALT = "test-salt"
+    INITIAL_PASSWORD_TOKEN_MAX_AGE = 3600
 
 @pytest.fixture
 def app():
@@ -47,6 +51,8 @@ def admin_setup(app):
             is_admin=True,
         )
         admin.set_password("admin-secret")
+        admin.activate()
+        admin.email_confirmed_at = datetime.now(timezone.utc)
         db.session.add(admin)
 
         guardian_user = User(
@@ -55,6 +61,8 @@ def admin_setup(app):
             password_hash="",
         )
         guardian_user.set_password("guardian-secret")
+        guardian_user.activate()
+        guardian_user.email_confirmed_at = datetime.now(timezone.utc)
         db.session.add(guardian_user)
         db.session.flush()
 
