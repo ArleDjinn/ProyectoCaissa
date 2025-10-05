@@ -1,3 +1,4 @@
+import math
 import secrets
 from datetime import datetime, timezone
 from flask import (
@@ -35,7 +36,7 @@ def _generate_initial_password_token(user: User) -> str:
 def send_initial_password_email(user: User, token: str, plan: Plan):
     confirm_url = url_for("auth.confirm_initial_password", token=token, _external=True)
     max_age = current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"]
-    expiration_hours = max(1, max_age // 3600)
+    expiration_hours = max(1, math.ceil(max_age / 3600))
     msg = Message(
         subject="Confirma tu acceso a Proyecto Caissa",
         recipients=[user.email],
@@ -54,7 +55,20 @@ def send_initial_password_email(user: User, token: str, plan: Plan):
         confirm_url=confirm_url,
         expiration_hours=expiration_hours,
     )
-    mail.send(msg)
+    try:
+        mail.send(msg)
+    except Exception as exc:
+        current_app.logger.error(
+            "Error enviando correo de contraseña inicial a %s: %s",
+            user.email,
+            exc,
+            exc_info=True,
+        )
+        flash(
+            "No pudimos enviar el correo de confirmación en este momento. "
+            "Te contactaremos manualmente o inténtalo nuevamente más tarde.",
+            "warning",
+        )
 
 @bp.route("/inscripcion/<int:plan_id>", methods=["GET", "POST"])
 def inscripcion(plan_id):
