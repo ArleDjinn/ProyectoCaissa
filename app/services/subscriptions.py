@@ -1,7 +1,15 @@
 # services/subscriptions.py
-from ..models import Subscription, SubscriptionStatus, Plan, Guardian, BillingCycle
-from ..extensions import db
 from datetime import date
+
+from ..models import (
+    Subscription,
+    SubscriptionStatus,
+    Plan,
+    Guardian,
+    BillingCycle,
+    EnrollmentStatus,
+)
+from ..extensions import db
 
 def create_subscription(guardian: Guardian, plan: Plan,
                         billing_cycle: BillingCycle = BillingCycle.monthly,
@@ -20,10 +28,16 @@ def get_active_subscriptions(guardian: Guardian):
         guardian_id=guardian.id, status=SubscriptionStatus.active
     ).all()
 
-def cancel_subscription(sub: Subscription):
+def cancel_subscription(sub: Subscription, *, cancel_enrollments: bool = True, end_date: date | None = None):
     sub.status = SubscriptionStatus.canceled
+    sub.end_date = end_date or date.today()
+    if cancel_enrollments:
+        for enrollment in sub.enrollments:
+            if enrollment.status == EnrollmentStatus.active:
+                enrollment.status = EnrollmentStatus.canceled
     return sub
 
 def activate_subscription(sub: Subscription):
     sub.status = SubscriptionStatus.active
+    sub.end_date = None
     return sub

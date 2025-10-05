@@ -1,0 +1,242 @@
+{% extends "admin/dashboard_base.html" %}
+{% block dashboard_content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 gap-3">
+  <div>
+    <h1 class="h3 mb-1">Suscripción #{{ subscription.id }}</h1>
+    <p class="text-muted mb-0">{{ subscription.plan.name }} · {{ subscription.billing_cycle.value }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if subscription.status != SubscriptionStatus.canceled %}
+      <form method="post" class="d-inline">
+        {{ cancel_subscription_form.hidden_tag() }}
+        <input type="hidden" name="action" value="cancel_subscription">
+        <button type="submit" class="btn btn-outline-danger">
+          🛑 Cancelar suscripción
+        </button>
+      </form>
+    {% else %}
+      <form method="post" class="d-inline">
+        {{ activate_subscription_form.hidden_tag() }}
+        <input type="hidden" name="action" value="activate_subscription">
+        <button type="submit" class="btn btn-success">
+          ✅ Reactivar suscripción
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Datos del apoderado</h2>
+        <form method="post">
+          {{ guardian_form.hidden_tag() }}
+          <input type="hidden" name="action" value="update_guardian">
+          <div class="mb-3">
+            {{ guardian_form.name.label(class="form-label") }}
+            {{ guardian_form.name(class="form-control", placeholder="Nombre completo") }}
+            {% for error in guardian_form.name.errors %}
+              <div class="form-text text-danger">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ guardian_form.email.label(class="form-label") }}
+            {{ guardian_form.email(class="form-control", placeholder="correo@ejemplo.com") }}
+            {% for error in guardian_form.email.errors %}
+              <div class="form-text text-danger">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ guardian_form.phone.label(class="form-label") }}
+            {{ guardian_form.phone(class="form-control", placeholder="+56912345678") }}
+            {% for error in guardian_form.phone.errors %}
+              <div class="form-text text-danger">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="form-check mb-3">
+            {{ guardian_form.allow_whatsapp_group(class="form-check-input", id="guardian-allow-whatsapp") }}
+            <label class="form-check-label" for="guardian-allow-whatsapp">
+              {{ guardian_form.allow_whatsapp_group.label.text }}
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Agregar nuevo hijo/a</h2>
+        <form method="post">
+          {{ new_child_form.hidden_tag() }}
+          <input type="hidden" name="action" value="add_child">
+          <div class="mb-3">
+            {{ new_child_form.name.label(class="form-label") }}
+            {{ new_child_form.name(class="form-control", placeholder="Nombre completo") }}
+            {% for error in new_child_form.name.errors %}
+              <div class="form-text text-danger">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              {{ new_child_form.birthdate.label(class="form-label") }}
+              {{ new_child_form.birthdate(class="form-control", placeholder="YYYY-MM-DD") }}
+              {% for error in new_child_form.birthdate.errors %}
+                <div class="form-text text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              {{ new_child_form.knowledge_level.label(class="form-label") }}
+              {{ new_child_form.knowledge_level(class="form-select") }}
+            </div>
+          </div>
+          <div class="mb-3 mt-3">
+            {{ new_child_form.health_info.label(class="form-label") }}
+            {{ new_child_form.health_info(class="form-control", placeholder="Alergias, indicaciones, etc.") }}
+          </div>
+          <div class="form-check mb-3">
+            {{ new_child_form.allow_media(class="form-check-input", id="new-child-allow-media") }}
+            <label class="form-check-label" for="new-child-allow-media">
+              {{ new_child_form.allow_media.label.text }}
+            </label>
+          </div>
+          <button type="submit" class="btn btn-outline-primary">Agregar hijo/a</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4">
+  <h2 class="h5 mb-3">Hijos inscritos</h2>
+  <div class="row g-4">
+    {% for child in subscription.guardian.children %}
+      <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <h3 class="h6 mb-0">{{ child.name }}</h3>
+              {% set delete_form = delete_child_forms.get(child.id) %}
+              {% if delete_form %}
+                <form method="post" onsubmit="return confirm('¿Eliminar a {{ child.name }}?');">
+                  {{ delete_form.hidden_tag() }}
+                  <input type="hidden" name="action" value="delete_child">
+                  <button type="submit" class="btn btn-link text-danger p-0">Eliminar</button>
+                </form>
+              {% endif %}
+            </div>
+            {% set child_form = child_forms.get(child.id) %}
+            {% if child_form %}
+              <form method="post">
+                {{ child_form.hidden_tag() }}
+                <input type="hidden" name="action" value="update_child">
+                <div class="mb-2">
+                  {{ child_form.name.label(class="form-label") }}
+                  {{ child_form.name(class="form-control") }}
+                  {% for error in child_form.name.errors %}
+                    <div class="form-text text-danger">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="mb-2">
+                  {{ child_form.birthdate.label(class="form-label") }}
+                  {{ child_form.birthdate(class="form-control") }}
+                  {% for error in child_form.birthdate.errors %}
+                    <div class="form-text text-danger">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="mb-2">
+                  {{ child_form.knowledge_level.label(class="form-label") }}
+                  {{ child_form.knowledge_level(class="form-select") }}
+                </div>
+                <div class="mb-2">
+                  {{ child_form.health_info.label(class="form-label") }}
+                  {{ child_form.health_info(class="form-control") }}
+                </div>
+                <div class="form-check mb-3">
+                  {{ child_form.allow_media(class="form-check-input", id="child-allow-media-{{ child.id }}") }}
+                  <label class="form-check-label" for="child-allow-media-{{ child.id }}">
+                    {{ child_form.allow_media.label.text }}
+                  </label>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="col-12">
+        <div class="alert alert-info mb-0">
+          Este apoderado aún no tiene hijos registrados.
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="mt-4">
+  <h2 class="h5 mb-3">Matrículas</h2>
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">Niño/a</th>
+              <th scope="col">Taller</th>
+              <th scope="col">Estado</th>
+              <th scope="col" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for enrollment in subscription.enrollments %}
+              <tr>
+                <td>{{ enrollment.child.name }}</td>
+                <td>
+                  {{ enrollment.workshop.name }}<br>
+                  <small class="text-muted">{{ enrollment.workshop.day_of_week.value }} · {{ enrollment.workshop.start_time.strftime('%H:%M') if enrollment.workshop.start_time else '—' }}</small>
+                </td>
+                <td>
+                  <span class="badge rounded-pill text-bg-{{ 'success' if enrollment.status == EnrollmentStatus.active else ('secondary' if enrollment.status == EnrollmentStatus.changed else 'danger') }}">{{ enrollment.status.value }}</span>
+                </td>
+                <td class="text-end">
+                  {% set move_form = move_enrollment_forms.get(enrollment.id) %}
+                  {% set cancel_form = cancel_enrollment_forms.get(enrollment.id) %}
+                  <div class="d-flex flex-column align-items-end gap-2">
+                    {% if move_form %}
+                      <form method="post" class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
+                        {{ move_form.hidden_tag() }}
+                        <input type="hidden" name="action" value="move_enrollment">
+                        {{ move_form.new_workshop_id(class="form-select form-select-sm w-auto") }}
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Mover</button>
+                      </form>
+                    {% endif %}
+                    {% if cancel_form %}
+                      <form method="post" class="d-inline">
+                        {{ cancel_form.hidden_tag() }}
+                        <input type="hidden" name="action" value="cancel_enrollment">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar</button>
+                      </form>
+                    {% endif %}
+                    {% if not move_form and not cancel_form %}
+                      <span class="text-muted">Sin acciones</span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="4" class="text-center py-4 text-muted">No hay matrículas registradas.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
