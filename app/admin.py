@@ -69,16 +69,30 @@ def trigger_password_reset(user_id):
     token = generate_password_reset_token(user)
     user.set_password_reset_token(token)
     db.session.commit()
-    send_password_reset_email(user, token)
-    expiration_hours = max(1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600))
-    hours_label = "hora" if expiration_hours == 1 else "horas"
-    flash(
-        f"Se envió un enlace de restablecimiento a {user.email}. Caduca en {expiration_hours} {hours_label}.",
-        "info",
-    )
-    current_app.logger.info(
-        "Admin %s solicitó restablecimiento de contraseña para %s", current_user.email, user.email
-    )
+    try:
+        send_password_reset_email(user, token)
+    except (Exception, SystemExit) as exc:
+        current_app.logger.error(
+            "Error enviando correo de restablecimiento a %s: %s",
+            user.email,
+            exc,
+            exc_info=True,
+        )
+        flash(
+            "No pudimos enviar el correo de restablecimiento en este momento. "
+            "Contacta manualmente al usuario o inténtalo nuevamente más tarde.",
+            "warning",
+        )
+    else:
+        expiration_hours = max(1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600))
+        hours_label = "hora" if expiration_hours == 1 else "horas"
+        flash(
+            f"Se envió un enlace de restablecimiento a {user.email}. Caduca en {expiration_hours} {hours_label}.",
+            "info",
+        )
+        current_app.logger.info(
+            "Admin %s solicitó restablecimiento de contraseña para %s", current_user.email, user.email
+        )
     return redirect(request.referrer or url_for("admin.dashboard_payments"))
 
 # --- Gestión de matrículas ---

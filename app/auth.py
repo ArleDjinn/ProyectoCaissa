@@ -1,5 +1,7 @@
 # app/auth.py
 import math
+import socket
+from contextlib import contextmanager
 from urllib.parse import urlparse
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
@@ -79,6 +81,18 @@ def generate_password_reset_token(user: User) -> str:
     serializer = _get_serializer()
     return serializer.dumps({"user_id": user.id, "purpose": PASSWORD_RESET_PURPOSE})
 
+@contextmanager
+def _temporary_socket_timeout(timeout: int | None):
+    if not timeout or timeout <= 0:
+        yield
+        return
+
+    previous_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(timeout)
+    try:
+        yield
+    finally:
+        socket.setdefaulttimeout(previous_timeout)
 
 def send_password_reset_email(user: User, token: str):
     reset_url = url_for("auth.reset_password", token=token, _external=True)
@@ -99,7 +113,9 @@ def send_password_reset_email(user: User, token: str):
         reset_url=reset_url,
         expiration_hours=expiration_hours,
     )
-    mail.send(msg)
+    timeout = current_app.config.get("MAIL_SEND_TIMEOUT")
+    with _temporary_socket_timeout(timeout):
+        mail.send(msg)
 
 @bp.route("/confirmar/<token>", methods=["GET", "POST"])
 def confirm_initial_password(token):
@@ -151,8 +167,17 @@ def request_password_reset():
             token = generate_password_reset_token(user)
             user.set_password_reset_token(token)
             db.session.commit()
-            send_password_reset_email(user, token)
-            current_app.logger.info("Password reset email sent to %s", user.email)
+            try:
+                send_password_reset_email(user, token)
+            except (Exception, SystemExit) as exc:
+                current_app.logger.error(
+                    "Error enviando correo de restablecimiento a %s: %s",
+                    user.email,
+                    exc,
+                    exc_info=True,
+                )
+            else:
+                current_app.logger.info("Password reset email sent to %s", user.email)
         expiration_hours = _token_expiration_hours()
         hours_label = "hora" if expiration_hours == 1 else "horas"
         flash(

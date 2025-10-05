@@ -29,9 +29,9 @@ class Config:
     if _mail_provider in {"google_workspace", "gmail"}:
         _mail_defaults = {
             "MAIL_SERVER": "smtp.gmail.com",
-            "MAIL_PORT": 587,
-            "MAIL_USE_TLS": True,
-            "MAIL_USE_SSL": False,
+            "MAIL_PORT": 465,
+            "MAIL_USE_TLS": False,
+            "MAIL_USE_SSL": True,
         }
     else:
         _mail_defaults = {
@@ -51,6 +51,7 @@ class Config:
         "MAIL_DEFAULT_SENDER", os.environ.get("MAIL_USERNAME", "no-reply@example.com")
     )
     MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", default=False)
+    MAIL_SEND_TIMEOUT = int(os.environ.get("MAIL_SEND_TIMEOUT", 15))
 
     # Tokens
     INITIAL_PASSWORD_TOKEN_SALT = os.environ.get(

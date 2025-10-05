@@ -22,6 +22,7 @@ class TestConfig:
     WTF_CSRF_ENABLED = False
     MAIL_SUPPRESS_SEND = True
     MAIL_DEFAULT_SENDER = "test@example.com"
+    MAIL_SEND_TIMEOUT = 1
     INITIAL_PASSWORD_TOKEN_SALT = "test-salt"
     INITIAL_PASSWORD_TOKEN_MAX_AGE = 3600
     SERVER_NAME = "example.com"
@@ -41,7 +42,6 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
-
 
 def create_admin_and_user():
     admin = User(email="admin@example.com", name="Admin", password_hash="")
@@ -89,6 +89,70 @@ def test_admin_can_trigger_password_reset_email(client, app):
         assert refreshed.password_reset_token_hash is not None
 
 
+def test_admin_password_reset_handles_email_failure(monkeypatch, client, app):
+    with app.app_context():
+        admin, guardian = create_admin_and_user()
+        db.session.add_all([admin, guardian])
+        db.session.commit()
+        guardian_id = guardian.id
+
+    login_response = client.post(
+        "/auth/login",
+        data={"email": "admin@example.com", "password": "AdminPass123!"},
+        follow_redirects=True,
+    )
+    assert login_response.status_code == 200
+
+    def fail_send(_msg):
+        raise RuntimeError("Mail server unavailable")
+
+    monkeypatch.setattr("app.auth.mail.send", fail_send)
+
+    response = client.post(
+        f"/admin/usuarios/{guardian_id}/reset-password",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No pudimos enviar el correo de restablecimiento" in body
+
+    with app.app_context():
+        refreshed = db.session.get(User, guardian_id)
+        assert refreshed.password_reset_token_hash is not None
+
+def test_admin_password_reset_handles_system_exit(monkeypatch, client, app):
+    with app.app_context():
+        admin, guardian = create_admin_and_user()
+        db.session.add_all([admin, guardian])
+        db.session.commit()
+        guardian_id = guardian.id
+
+    login_response = client.post(
+        "/auth/login",
+        data={"email": "admin@example.com", "password": "AdminPass123!"},
+        follow_redirects=True,
+    )
+    assert login_response.status_code == 200
+
+    def exit_send(_msg):
+        raise SystemExit(1)
+
+    monkeypatch.setattr("app.auth.mail.send", exit_send)
+
+    response = client.post(
+        f"/admin/usuarios/{guardian_id}/reset-password",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No pudimos enviar el correo de restablecimiento" in body
+
+    with app.app_context():
+        refreshed = db.session.get(User, guardian_id)
+        assert refreshed.password_reset_token_hash is not None
+
 def test_user_can_complete_password_reset_flow(client, app):
     new_password = "NuevaClaveSegura1!"
     with app.app_context():
@@ -122,3 +186,27 @@ def test_user_can_complete_password_reset_flow(client, app):
         refreshed = db.session.get(User, user_id)
         assert refreshed.password_reset_token_hash is None
         assert refreshed.check_password(new_password)
+
+def test_self_service_reset_handles_system_exit(monkeypatch, client, app):
+    with app.app_context():
+        user = User(email="self@example.com", name="Self", password_hash="")
+        user.set_password("Temporal123!")
+        user.activate()
+        user.email_confirmed_at = datetime.now(timezone.utc)
+        db.session.add(user)
+        db.session.commit()
+
+    def exit_send(_msg):
+        raise SystemExit(2)
+
+    monkeypatch.setattr("app.auth.mail.send", exit_send)
+
+    response = client.post(
+        "/auth/reset/solicitar",
+        data={"email": "self@example.com"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Si el correo ingresado está registrado" in body
