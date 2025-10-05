@@ -62,9 +62,9 @@
           </li>
 
           <li class="nav-item">
-            <a class="nav-link {% if request.endpoint in ['admin.dashboard_enrollments'] %}active{% endif %}"
-               href="{{ url_for('admin.dashboard_enrollments') }}">
-              👧 Matrículas
+            <a class="nav-link {% if request.endpoint in ['admin.dashboard_subscriptions','admin.subscription_detail'] %}active{% endif %}"
+               href="{{ url_for('admin.dashboard_subscriptions') }}">
+              🧾 Suscripciones
             </a>
           </li>
         </ul>
