@@ -5,7 +5,21 @@ import os
 import smtplib
 import ssl
 import sys
+from pathlib import Path
 from typing import Optional
+
+from dotenv import load_dotenv
+
+
+def _load_project_env() -> None:
+    """Load environment files just like the Flask app does."""
+
+    base_dir = Path(__file__).resolve().parent.parent
+    load_dotenv(base_dir / ".env", override=False)
+    load_dotenv(base_dir / "instance" / ".env", override=False)
+
+
+_load_project_env()
 
 
 def _env_bool(key: str, default: bool = False) -> bool:
@@ -30,18 +44,42 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
+def _mail_defaults() -> tuple[str, dict[str, object]]:
+    provider = os.environ.get("MAIL_PROVIDER", "default").strip().lower() or "default"
+    if provider in {"google_workspace", "gmail"}:
+        defaults = {
+            "MAIL_SERVER": "smtp.gmail.com",
+            "MAIL_PORT": 587,
+            "MAIL_USE_TLS": True,
+            "MAIL_USE_SSL": False,
+        }
+    else:
+        defaults = {
+            "MAIL_SERVER": "localhost",
+            "MAIL_PORT": 25,
+            "MAIL_USE_TLS": False,
+            "MAIL_USE_SSL": False,
+        }
+    return provider, defaults
+
+
 def main(argv: list[str]) -> int:
     debug = "--debug" in argv
 
-    server = os.environ.get("MAIL_SERVER", "localhost")
-    port = _env_int("MAIL_PORT", 25)
-    use_tls = _env_bool("MAIL_USE_TLS", False)
-    use_ssl = _env_bool("MAIL_USE_SSL", False)
+    provider, defaults = _mail_defaults()
+
+    server = os.environ.get("MAIL_SERVER", defaults["MAIL_SERVER"])
+    port = _env_int("MAIL_PORT", int(defaults["MAIL_PORT"]))
+    use_tls = _env_bool("MAIL_USE_TLS", bool(defaults["MAIL_USE_TLS"]))
+    use_ssl = _env_bool("MAIL_USE_SSL", bool(defaults["MAIL_USE_SSL"]))
     timeout = float(os.environ.get("MAIL_SEND_TIMEOUT", "15"))
     username = os.environ.get("MAIL_USERNAME")
     password_present = bool(os.environ.get("MAIL_PASSWORD"))
 
     print("SMTP diagnostics")
+    print(f"  provider: {provider}")
+    if (server, port) != (defaults["MAIL_SERVER"], defaults["MAIL_PORT"]):
+        print("  server override detected via environment variables")
     print(f"  server: {server}:{port}")
     print(f"  use_ssl: {use_ssl}")
     print(f"  use_tls: {use_tls}")
@@ -96,6 +134,12 @@ def main(argv: list[str]) -> int:
         return 0
     except (OSError, smtplib.SMTPException) as exc:
         print(f"Connection error: {exc}")
+        if isinstance(exc, OSError) and getattr(exc, "errno", None) == 111:
+            print(
+                "  hint: connection refused usually means no SMTP server is listening on the"
+                " configured host/port. Check that your MAIL_PROVIDER/.env settings are"
+                " correct and that the service is reachable from this machine."
+            )
         return 1
     finally:
         if smtp is not None:
