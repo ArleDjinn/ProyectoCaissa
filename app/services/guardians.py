@@ -1,26 +1,14 @@
 # services/guardians.py
-from ..models import Guardian, User, Child, KnowledgeLevel
-from ..extensions import db
 from datetime import date
+
+from ..extensions import db
+from ..models import Child, Guardian, KnowledgeLevel, User
 
 # -------- Guardian --------
 def create_guardian(user: User, phone: str, allow_whatsapp_group: bool = False) -> Guardian:
     guardian = Guardian(user=user, phone=phone, allow_whatsapp_group=allow_whatsapp_group)
     db.session.add(guardian)
     return guardian
-
-def get_guardian_by_user(user: User) -> Guardian:
-    return Guardian.query.filter_by(user_id=user.id).first()
-
-def update_guardian(guardian: Guardian, phone: str = None, allow_whatsapp_group: bool = None) -> Guardian:
-    if phone is not None:
-        guardian.phone = phone
-    if allow_whatsapp_group is not None:
-        guardian.allow_whatsapp_group = allow_whatsapp_group
-    return guardian
-
-def delete_guardian(guardian: Guardian):
-    db.session.delete(guardian)
 
 # -------- Child --------
 def create_child(guardian: Guardian, name: str, birthdate: date = None,
@@ -37,9 +25,6 @@ def create_child(guardian: Guardian, name: str, birthdate: date = None,
     )
     db.session.add(child)
     return child
-
-def get_children_by_guardian(guardian: Guardian):
-    return Child.query.filter_by(guardian_id=guardian.id).all()
 
 def update_child(child: Child, name: str = None, birthdate: date = None,
                  knowledge_level: KnowledgeLevel = None,
