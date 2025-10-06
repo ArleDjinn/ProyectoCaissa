@@ -1,5 +1,7 @@
 # app/admin.py
 import math
+import calendar
+from datetime import date
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, current_app
 from flask_login import login_required, current_user
@@ -19,6 +21,7 @@ from .services import admin as admin_service
 from .services import enrollments as enrollment_service
 from .services import guardians as guardian_service
 from .services import subscriptions as subscription_service
+from .services import orders as order_service
 from .models import (
     Child,
     Order,
@@ -27,9 +30,11 @@ from .models import (
     Plan,
     EnrollmentStatus,
     PaymentStatus,
+    PaymentMethod,
     User,
     Subscription,
     SubscriptionStatus,
+    BillingCycle,
     Guardian,
     KnowledgeLevel,
 )
@@ -37,6 +42,78 @@ from .extensions import db
 from .auth import generate_password_reset_token, send_password_reset_email
 
 bp = Blueprint("admin", __name__, template_folder="templates")
+
+
+def _add_months(base_date: date, months: int) -> date:
+    month = base_date.month - 1 + months
+    year = base_date.year + month // 12
+    month = month % 12 + 1
+    day = min(base_date.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _subscription_due_info(subscription: Subscription):
+    if subscription.status != SubscriptionStatus.active:
+        return None
+
+    orders = sorted(subscription.orders, key=lambda o: o.created_at, reverse=True)
+    pending_like = next(
+        (
+            order
+            for order in orders
+            if order.payment_status in {PaymentStatus.pending, PaymentStatus.reserved}
+        ),
+        None,
+    )
+    if pending_like:
+        return None
+
+    today = date.today()
+    cycle_months = 1 if subscription.billing_cycle == BillingCycle.monthly else 3
+    last_paid = next(
+        (order for order in orders if order.payment_status == PaymentStatus.paid), None
+    )
+
+    if last_paid:
+        due_date = _add_months(last_paid.created_at.date(), cycle_months)
+        if due_date > today:
+            return None
+        recommended_method = last_paid.payment_method
+        last_order = last_paid
+        reason = (
+            f"Última orden pagada el {last_paid.created_at.strftime('%d-%m-%Y')}"
+        )
+    elif orders:
+        last_order = orders[0]
+        due_date = last_order.created_at.date()
+        if due_date > today:
+            return None
+        recommended_method = last_order.payment_method
+        reason = (
+            f"Última orden {last_order.payment_status.value.lower()} el "
+            f"{last_order.created_at.strftime('%d-%m-%Y')}"
+        )
+    else:
+        due_date = subscription.start_date or today
+        if due_date > today:
+            return None
+        last_order = None
+        recommended_method = PaymentMethod.transfer
+        reason = "La suscripción no tiene órdenes registradas."
+
+    days_overdue = max(0, (today - due_date).days)
+    amount = order_service.calculate_subscription_amount(subscription)
+
+    return {
+        "subscription": subscription,
+        "due_date": due_date,
+        "days_overdue": days_overdue,
+        "recommended_method": recommended_method,
+        "amount_clp": amount,
+        "last_order": last_order,
+        "reason": reason,
+    }
+
 
 @bp.before_request
 def ensure_admin_permissions():
@@ -68,7 +145,27 @@ def dashboard_payments():
     # Órdenes pendientes
     pending_orders = Order.query.filter_by(payment_status=PaymentStatus.pending).all()
     paid_orders = Order.query.filter_by(payment_status=PaymentStatus.paid).all()
-    reset_expiration_hours = max(1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600))
+
+    active_subscriptions = (
+        Subscription.query.options(
+            joinedload(Subscription.guardian).joinedload(Guardian.user),
+            joinedload(Subscription.plan),
+            joinedload(Subscription.orders),
+        )
+        .filter(Subscription.status == SubscriptionStatus.active)
+        .all()
+    )
+    subscriptions_due = []
+    for subscription in active_subscriptions:
+        info = _subscription_due_info(subscription)
+        if info is not None:
+            subscriptions_due.append(info)
+
+    subscriptions_due.sort(key=lambda item: (item["due_date"], item["subscription"].id))
+
+    reset_expiration_hours = max(
+        1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600)
+    )
 
     return render_template(
         "admin/dashboard_payments.html",
@@ -77,7 +174,59 @@ def dashboard_payments():
         new_children=new_children,
         last_login=last_login,
         reset_expiration_hours=reset_expiration_hours,
+        subscriptions_due=subscriptions_due,
     )
+
+
+@bp.route("/dashboard/pagos/subscriptions/<int:subscription_id>/emitir", methods=["POST"])
+@login_required
+def issue_subscription_order(subscription_id):
+    subscription = (
+        Subscription.query.options(
+            joinedload(Subscription.guardian).joinedload(Guardian.user),
+            joinedload(Subscription.plan),
+            joinedload(Subscription.orders),
+        )
+        .filter_by(id=subscription_id)
+        .first()
+    )
+    if subscription is None:
+        abort(404)
+
+    if subscription.status != SubscriptionStatus.active:
+        flash("La suscripción debe estar activa para emitir una nueva orden.", "warning")
+        return redirect(request.referrer or url_for("admin.dashboard_payments"))
+
+    pending_like = next(
+        (
+            order
+            for order in subscription.orders
+            if order.payment_status in {PaymentStatus.pending, PaymentStatus.reserved}
+        ),
+        None,
+    )
+    if pending_like is not None:
+        flash("La suscripción ya tiene una orden pendiente o reservada.", "info")
+        return redirect(request.referrer or url_for("admin.dashboard_payments"))
+
+    info = _subscription_due_info(subscription)
+    if info is None:
+        flash("La suscripción aún no requiere una nueva orden de pago.", "info")
+        return redirect(request.referrer or url_for("admin.dashboard_payments"))
+
+    new_order = order_service.create_billing_cycle_order(
+        subscription, info["recommended_method"]
+    )
+    db.session.commit()
+
+    amount_formatted = f"${new_order.amount_clp:,}".replace(",", ".")
+    flash(
+        f"Se emitió la orden #{new_order.id} por {amount_formatted} {new_order.currency}.",
+        "success",
+    )
+
+    return redirect(url_for("admin.dashboard_payments"))
+
 
 @bp.route("/usuarios/<int:user_id>/reset-password", methods=["POST"])
 @login_required
