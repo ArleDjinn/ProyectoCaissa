@@ -25,6 +25,75 @@
     </div>
 </div>
 
+<!-- Suscripciones que necesitan reemitir orden -->
+<div class="card mb-4">
+    <div class="card-header">
+        Renovación de órdenes de pago
+    </div>
+    <div class="card-body p-0">
+        {% if subscriptions_due %}
+            <div class="table-responsive">
+                <table class="table table-striped align-middle mb-0">
+                    <thead class="table-dark">
+                    <tr>
+                        <th>Apoderado</th>
+                        <th>Plan</th>
+                        <th>Última orden</th>
+                        <th>Próxima emisión</th>
+                        <th class="text-center">Monto</th>
+                        <th class="text-center">Acción</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in subscriptions_due %}
+                        <tr>
+                            <td>
+                                {{ item.subscription.guardian.user.name }}<br>
+                                <small class="text-muted">{{ item.subscription.guardian.user.email }}</small>
+                            </td>
+                            <td>
+                                {{ item.subscription.plan.name }}<br>
+                                <small class="text-muted">{{ item.subscription.billing_cycle.value }}</small>
+                            </td>
+                            <td>
+                                {% if item.last_order %}
+                                    #{{ item.last_order.id }} · {{ item.last_order.payment_status.value }}<br>
+                                    <small class="text-muted">Emitida el {{ item.last_order.created_at.strftime('%d-%m-%Y') }}</small><br>
+                                    <small class="text-muted">Método sugerido: {{ item.recommended_method.value }}</small>
+                                {% else %}
+                                    <span class="text-muted">Sin órdenes registradas</span><br>
+                                    <small class="text-muted">Método sugerido: {{ item.recommended_method.value }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.days_overdue > 0 %}
+                                    <span class="text-danger fw-semibold">Vencida hace {{ item.days_overdue }} día{% if item.days_overdue != 1 %}s{% endif %}</span><br>
+                                {% else %}
+                                    <span class="text-warning fw-semibold">Emitir hoy</span><br>
+                                {% endif %}
+                                <small class="text-muted">{{ item.reason }}</small><br>
+                                <small class="text-muted">Próxima fecha: {{ item.due_date.strftime('%d-%m-%Y') }}</small>
+                            </td>
+                            <td class="text-center">
+                                ${{ "{:,}".format(item.amount_clp).replace(",", ".") }} CLP
+                            </td>
+                            <td class="text-center">
+                                <form action="{{ url_for('admin.issue_subscription_order', subscription_id=item.subscription.id) }}" method="post">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-primary btn-sm">Emitir orden</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted m-3">Todas las suscripciones activas están al día.</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Tabla de órdenes pendientes -->
 <div class="card">
     <div class="card-header">
