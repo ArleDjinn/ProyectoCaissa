@@ -83,12 +83,13 @@
     <!-- Main content -->
     <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
 
-      {# Flash messages (BS5) #}
+      {% block flash_messages %}
+      {# Flash messages (Bootstrap 5 toasts) #}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080;">
             {% for category, message in messages %}
-              <div class="toast align-items-center text-bg-{{ 'warning' if category=='warning' else ('danger' if category=='danger' else ('success' if category=='success' else 'info')) }} border-0 show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="toast align-items-center text-bg-{{ 'warning' if category=='warning' else ('danger' if category=='danger' else ('success' if category=='success' else 'info')) }} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="5000">
                 <div class="d-flex">
                   <div class="toast-body">
                     {{ message }}
@@ -100,9 +101,23 @@
           </div>
         {% endif %}
       {% endwith %}
+      {% endblock %}
 
       {% block dashboard_content %}{% endblock %}
     </main>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ super() }}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+      toastElList.forEach(function (toastEl) {
+        var toast = new bootstrap.Toast(toastEl);
+        toast.show();
+      });
+    });
+  </script>
 {% endblock %}

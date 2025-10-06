@@ -44,29 +44,27 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
-def _mail_defaults() -> tuple[str, dict[str, object]]:
-    provider = os.environ.get("MAIL_PROVIDER", "default").strip().lower() or "default"
+def _mail_defaults() -> dict[str, object]:
+    provider = os.environ.get("MAIL_PROVIDER", "default").strip().lower()
     if provider in {"google_workspace", "gmail"}:
-        defaults = {
+        return {
             "MAIL_SERVER": "smtp.gmail.com",
             "MAIL_PORT": 587,
             "MAIL_USE_TLS": True,
             "MAIL_USE_SSL": False,
         }
-    else:
-        defaults = {
-            "MAIL_SERVER": "localhost",
-            "MAIL_PORT": 25,
-            "MAIL_USE_TLS": False,
-            "MAIL_USE_SSL": False,
-        }
-    return provider, defaults
+    return {
+        "MAIL_SERVER": "localhost",
+        "MAIL_PORT": 25,
+        "MAIL_USE_TLS": False,
+        "MAIL_USE_SSL": False,
+    }
 
 
 def main(argv: list[str]) -> int:
     debug = "--debug" in argv
 
-    provider, defaults = _mail_defaults()
+    defaults = _mail_defaults()
 
     server = os.environ.get("MAIL_SERVER", defaults["MAIL_SERVER"])
     port = _env_int("MAIL_PORT", int(defaults["MAIL_PORT"]))
