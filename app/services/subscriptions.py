@@ -23,11 +23,6 @@ def create_subscription(guardian: Guardian, plan: Plan,
     db.session.add(sub)
     return sub
 
-def get_active_subscriptions(guardian: Guardian):
-    return Subscription.query.filter_by(
-        guardian_id=guardian.id, status=SubscriptionStatus.active
-    ).all()
-
 def cancel_subscription(sub: Subscription, *, cancel_enrollments: bool = True, end_date: date | None = None):
     from . import enrollments as enrollment_service
 
