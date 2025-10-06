@@ -5,7 +5,21 @@ import os
 import smtplib
 import ssl
 import sys
+from pathlib import Path
 from typing import Optional
+
+from dotenv import load_dotenv
+
+
+def _load_project_env() -> None:
+    """Load environment files just like the Flask app does."""
+
+    base_dir = Path(__file__).resolve().parent.parent
+    load_dotenv(base_dir / ".env", override=False)
+    load_dotenv(base_dir / "instance" / ".env", override=False)
+
+
+_load_project_env()
 
 
 def _env_bool(key: str, default: bool = False) -> bool:
@@ -61,6 +75,9 @@ def main(argv: list[str]) -> int:
     password_present = bool(os.environ.get("MAIL_PASSWORD"))
 
     print("SMTP diagnostics")
+    print(f"  provider: {provider}")
+    if (server, port) != (defaults["MAIL_SERVER"], defaults["MAIL_PORT"]):
+        print("  server override detected via environment variables")
     print(f"  server: {server}:{port}")
     print(f"  use_ssl: {use_ssl}")
     print(f"  use_tls: {use_tls}")
@@ -115,6 +132,12 @@ def main(argv: list[str]) -> int:
         return 0
     except (OSError, smtplib.SMTPException) as exc:
         print(f"Connection error: {exc}")
+        if isinstance(exc, OSError) and getattr(exc, "errno", None) == 111:
+            print(
+                "  hint: connection refused usually means no SMTP server is listening on the"
+                " configured host/port. Check that your MAIL_PROVIDER/.env settings are"
+                " correct and that the service is reachable from this machine."
+            )
         return 1
     finally:
         if smtp is not None:
