@@ -30,13 +30,32 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
+def _mail_defaults() -> dict[str, object]:
+    provider = os.environ.get("MAIL_PROVIDER", "default").strip().lower()
+    if provider in {"google_workspace", "gmail"}:
+        return {
+            "MAIL_SERVER": "smtp.gmail.com",
+            "MAIL_PORT": 587,
+            "MAIL_USE_TLS": True,
+            "MAIL_USE_SSL": False,
+        }
+    return {
+        "MAIL_SERVER": "localhost",
+        "MAIL_PORT": 25,
+        "MAIL_USE_TLS": False,
+        "MAIL_USE_SSL": False,
+    }
+
+
 def main(argv: list[str]) -> int:
     debug = "--debug" in argv
 
-    server = os.environ.get("MAIL_SERVER", "localhost")
-    port = _env_int("MAIL_PORT", 25)
-    use_tls = _env_bool("MAIL_USE_TLS", False)
-    use_ssl = _env_bool("MAIL_USE_SSL", False)
+    defaults = _mail_defaults()
+
+    server = os.environ.get("MAIL_SERVER", defaults["MAIL_SERVER"])
+    port = _env_int("MAIL_PORT", int(defaults["MAIL_PORT"]))
+    use_tls = _env_bool("MAIL_USE_TLS", bool(defaults["MAIL_USE_TLS"]))
+    use_ssl = _env_bool("MAIL_USE_SSL", bool(defaults["MAIL_USE_SSL"]))
     timeout = float(os.environ.get("MAIL_SEND_TIMEOUT", "15"))
     username = os.environ.get("MAIL_USERNAME")
     password_present = bool(os.environ.get("MAIL_PASSWORD"))
