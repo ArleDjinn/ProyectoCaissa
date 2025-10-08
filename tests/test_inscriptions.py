@@ -1,5 +1,5 @@
 import sys
-from datetime import time
+from datetime import time, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -11,11 +11,14 @@ if str(ROOT_DIR) not in sys.path:
 from app import create_app
 from app.extensions import db
 from app.models import (
-    Plan,
-    Workshop,
     DayOfWeek,
-    User,
+    Guardian,
+    Order,
+    PaymentMethod,
+    Plan,
     Subscription,
+    User,
+    Workshop,
 )
 
 
@@ -26,10 +29,12 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = False
     MAIL_DEFAULT_SENDER = "test@example.com"
-    MAIL_SUPPRESS_SEND = False
+    MAIL_SUPPRESS_SEND = True
     INITIAL_PASSWORD_TOKEN_SALT = "test-salt"
     INITIAL_PASSWORD_TOKEN_MAX_AGE = 3600
-    SERVER_NAME = "example.com"
+    SERVER_NAME = "localhost"
+    GOOGLE_CLIENT_ID = "test-client-id"
+    GOOGLE_CLIENT_SECRET = "test-client-secret"
 
 
 @pytest.fixture
@@ -68,21 +73,43 @@ def _create_plan_and_workshop():
     return plan, workshop
 
 
-def test_inscription_shows_warning_when_email_fails(monkeypatch, client, app):
+def _login(client, user_id: int):
+    with client.session_transaction() as session_ctx:
+        session_ctx["_user_id"] = str(user_id)
+        session_ctx["_fresh"] = True
+
+
+def test_inscription_requires_google_login_redirects(client, app):
+    with app.app_context():
+        plan, _ = _create_plan_and_workshop()
+        plan_id = plan.id
+
+    response = client.get(f"/inscripcion/{plan_id}")
+
+    assert response.status_code == 302
+    assert "/auth/google/start" in response.headers["Location"]
+
+
+def test_inscription_creates_guardian_for_authenticated_user(client, app):
     with app.app_context():
         plan, workshop = _create_plan_and_workshop()
+        user = User(email="guardian@example.com", name="Guardian", password_hash="hash")
+        user.google_sub = "google-sub-123"
+        user.activate()
+        user.email_confirmed_at = datetime.now(timezone.utc)
+        db.session.add(user)
+        db.session.commit()
+
         plan_id = plan.id
         workshop_id = workshop.id
+        user_id = user.id
 
-    def fail_send(_msg):
-        raise RuntimeError("Mail server unavailable")
-
-    monkeypatch.setattr("app.inscriptions.mail.send", fail_send)
+    _login(client, user_id)
 
     response = client.post(
         f"/inscripcion/{plan_id}",
         data={
-            "guardian_name": "Nombre Tutor",
+            "guardian_name": "Guardian",
             "guardian_email": "guardian@example.com",
             "phone": "+56912345678",
             "allow_whatsapp_group": "y",
@@ -100,15 +127,38 @@ def test_inscription_shows_warning_when_email_fails(monkeypatch, client, app):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "¡Inscripción confirmada!" in body
-    assert "No pudimos enviar el correo de confirmación" in body
     assert "Inscripción creada correctamente" in body
 
     with app.app_context():
-        user = User.query.filter_by(email="guardian@example.com").first()
-        assert user is not None
-        assert user.password_reset_token_hash is not None
+        user = db.session.get(User, user_id)
         guardian = user.guardian_profile
         assert guardian is not None
+        assert guardian.phone == "+56912345678"
         subscription = Subscription.query.filter_by(guardian_id=guardian.id).first()
         assert subscription is not None
-        assert subscription.created_at is not None
+        order = Order.query.filter_by(subscription_id=subscription.id).first()
+        assert order is not None
+        assert order.payment_method == PaymentMethod.transfer
+        assert user.password_reset_token_hash is None
+
+
+def test_inscription_blocks_existing_guardian(client, app):
+    with app.app_context():
+        plan, _ = _create_plan_and_workshop()
+        user = User(email="guardian2@example.com", name="Guardian", password_hash="hash")
+        user.google_sub = "google-sub-456"
+        user.activate()
+        user.email_confirmed_at = datetime.now(timezone.utc)
+        guardian = Guardian(user=user, phone="", allow_whatsapp_group=False)
+        db.session.add_all([user, guardian])
+        db.session.commit()
+
+        plan_id = plan.id
+        user_id = user.id
+
+    _login(client, user_id)
+
+    response = client.get(f"/inscripcion/{plan_id}")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Ya existe una inscripción asociada a tu cuenta" in body

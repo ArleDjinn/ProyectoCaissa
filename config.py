@@ -29,9 +29,9 @@ class Config:
     if _mail_provider in {"google_workspace", "gmail"}:
         _mail_defaults = {
             "MAIL_SERVER": "smtp.gmail.com",
-            "MAIL_PORT": 587,
-            "MAIL_USE_TLS": True,
-            "MAIL_USE_SSL": False,
+            "MAIL_PORT": 465,
+            "MAIL_USE_TLS": False,
+            "MAIL_USE_SSL": True,
         }
     else:
         _mail_defaults = {
@@ -52,6 +52,23 @@ class Config:
     )
     MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", default=False)
     MAIL_SEND_TIMEOUT = int(os.environ.get("MAIL_SEND_TIMEOUT", 15))
+
+    # Google OAuth
+    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+    GOOGLE_AUTHORIZATION_ENDPOINT = os.environ.get(
+        "GOOGLE_AUTHORIZATION_ENDPOINT",
+        "https://accounts.google.com/o/oauth2/v2/auth",
+    )
+    GOOGLE_TOKEN_ENDPOINT = os.environ.get(
+        "GOOGLE_TOKEN_ENDPOINT",
+        "https://oauth2.googleapis.com/token",
+    )
+    GOOGLE_USERINFO_ENDPOINT = os.environ.get(
+        "GOOGLE_USERINFO_ENDPOINT",
+        "https://openidconnect.googleapis.com/v1/userinfo",
+    )
+    GOOGLE_HTTP_TIMEOUT = int(os.environ.get("GOOGLE_HTTP_TIMEOUT", 10))
 
     # Tokens
     INITIAL_PASSWORD_TOKEN_SALT = os.environ.get(

@@ -68,6 +68,7 @@ class User(UserMixin, UtcTimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
+    google_sub = db.Column(db.String(255), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(512), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     last_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
