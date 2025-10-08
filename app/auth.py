@@ -1,11 +1,23 @@
 # app/auth.py
 import math
+import os
+import secrets
 import socket
 from contextlib import contextmanager
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask import (
+    Blueprint,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    request,
+    current_app,
+    session,
+)
 from flask_login import login_user, logout_user, login_required
+import requests
 from .models import User
 from .forms import (
     LoginForm,
@@ -23,9 +35,113 @@ bp = Blueprint("auth", __name__, template_folder="templates")
 INITIAL_PASSWORD_PURPOSE = "initial-password"
 PASSWORD_RESET_PURPOSE = "password-reset"
 
+GOOGLE_OAUTH_SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+]
+
+
+def _google_configured() -> bool:
+    return bool(
+        current_app.config.get("GOOGLE_CLIENT_ID")
+        and current_app.config.get("GOOGLE_CLIENT_SECRET")
+    )
+
+
+def _allow_insecure_transport_if_needed() -> None:
+    if (
+        current_app.config.get("TESTING")
+        or current_app.config.get("DEBUG")
+        or current_app.config.get("PREFERRED_URL_SCHEME", "http") == "http"
+    ):
+        os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+
+def _build_google_authorization_url(state: str) -> str:
+    params = {
+        "client_id": current_app.config["GOOGLE_CLIENT_ID"],
+        "response_type": "code",
+        "scope": " ".join(GOOGLE_OAUTH_SCOPES),
+        "redirect_uri": url_for("auth.google_callback", _external=True),
+        "access_type": "offline",
+        "include_granted_scopes": "true",
+        "prompt": "select_account",
+        "state": state,
+    }
+    return f"{current_app.config['GOOGLE_AUTHORIZATION_ENDPOINT']}?{urlencode(params)}"
+
+
+def _exchange_code_for_token(code: str) -> dict | None:
+    data = {
+        "code": code,
+        "client_id": current_app.config["GOOGLE_CLIENT_ID"],
+        "client_secret": current_app.config["GOOGLE_CLIENT_SECRET"],
+        "redirect_uri": url_for("auth.google_callback", _external=True),
+        "grant_type": "authorization_code",
+    }
+    timeout = current_app.config.get("GOOGLE_HTTP_TIMEOUT", 10)
+    try:
+        response = requests.post(
+            current_app.config["GOOGLE_TOKEN_ENDPOINT"],
+            data=data,
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        current_app.logger.error("Error solicitando token de Google: %s", exc, exc_info=True)
+        return None
+
+    if response.status_code >= 400:
+        current_app.logger.error(
+            "Google devolvió un error al intercambiar el código: %s %s",
+            response.status_code,
+            response.text,
+        )
+        return None
+
+    return response.json()
+
+
+def _fetch_google_userinfo(access_token: str) -> dict | None:
+    timeout = current_app.config.get("GOOGLE_HTTP_TIMEOUT", 10)
+    headers = {"Authorization": f"Bearer {access_token}"}
+    try:
+        response = requests.get(
+            current_app.config["GOOGLE_USERINFO_ENDPOINT"],
+            headers=headers,
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        current_app.logger.error("Error consultando datos de Google: %s", exc, exc_info=True)
+        return None
+
+    if response.status_code >= 400:
+        current_app.logger.error(
+            "Google devolvió un error al obtener los datos del usuario: %s %s",
+            response.status_code,
+            response.text,
+        )
+        return None
+
+    return response.json()
+
+
+def _finalize_login(user: User) -> None:
+    login_user(user)
+    user.previous_login_at = user.last_login_at
+    user.last_login_at = datetime.now(timezone.utc)
+    db.session.commit()
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
+    next_param = request.args.get("next")
+    google_login_url = None
+    if _google_configured():
+        if next_param:
+            google_login_url = url_for("auth.google_start", next=next_param)
+        else:
+            google_login_url = url_for("auth.google_start")
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
@@ -41,11 +157,19 @@ def login():
                     "warning",
                 )
                 return render_template("login.html", form=form)
-            login_user(user)
-            user.previous_login_at = user.last_login_at
-            user.last_login_at = datetime.now(timezone.utc)
-            db.session.commit()
-            next_page = request.args.get("next")
+            try:
+                _finalize_login(user)
+            except Exception as exc:
+                current_app.logger.error(
+                    "Error completando inicio de sesión para %s: %s",
+                    user.email,
+                    exc,
+                    exc_info=True,
+                )
+                db.session.rollback()
+                flash("Ocurrió un problema al iniciar sesión. Intenta nuevamente.", "danger")
+                return render_template("login.html", form=form)
+            next_page = next_param
             if next_page and urlparse(next_page).netloc == "":
                 return redirect(next_page)
             if user.is_admin:
@@ -57,13 +181,140 @@ def login():
             flash("Tu cuenta no tiene un portal asignado. Contáctanos para recibir ayuda.", "warning")
             return redirect(url_for("core.home"))
         flash("Credenciales inválidas", "danger")
-    return render_template("login.html", form=form)
+    return render_template("login.html", form=form, google_login_url=google_login_url)
 
 @bp.route("/logout")
 @login_required
 def logout():
     logout_user()
     flash("Sesión cerrada con éxito", "info")
+    return redirect(url_for("core.home"))
+
+
+@bp.route("/google/start")
+def google_start():
+    if not _google_configured():
+        flash(
+            "La autenticación con Google no está configurada. Contacta al equipo de Proyecto Caissa.",
+            "danger",
+        )
+        return redirect(url_for("auth.login"))
+
+    _allow_insecure_transport_if_needed()
+
+    next_url = request.args.get("next")
+    if next_url and urlparse(next_url).netloc != "":
+        next_url = url_for("core.home")
+
+    referrer = request.referrer
+    if referrer:
+        parsed_ref = urlparse(referrer)
+        if parsed_ref.netloc and parsed_ref.netloc != request.host:
+            referrer = None
+
+    session["google_oauth_next"] = next_url or referrer or url_for("core.home")
+
+    state = secrets.token_urlsafe(32)
+    session["google_oauth_state"] = state
+    authorization_url = _build_google_authorization_url(state)
+    return redirect(authorization_url)
+
+
+@bp.route("/google/callback")
+def google_callback():
+    if not _google_configured():
+        flash("La autenticación con Google no está disponible en este momento.", "danger")
+        return redirect(url_for("auth.login"))
+
+    _allow_insecure_transport_if_needed()
+
+    stored_state = session.pop("google_oauth_state", None)
+    incoming_state = request.args.get("state")
+    if not stored_state or stored_state != incoming_state:
+        flash("No pudimos validar tu inicio de sesión con Google. Intenta nuevamente.", "danger")
+        return redirect(url_for("auth.login"))
+
+    code = request.args.get("code")
+    if not code:
+        flash("Falta el código de autorización de Google.", "danger")
+        return redirect(url_for("auth.login"))
+
+    token_data = _exchange_code_for_token(code)
+    if not token_data:
+        flash("No pudimos autenticar tu cuenta de Google. Intenta nuevamente.", "danger")
+        return redirect(url_for("auth.login"))
+
+    access_token = token_data.get("access_token")
+    if not access_token:
+        current_app.logger.error("Respuesta de Google sin access_token: %s", token_data)
+        flash("No pudimos autenticar tu cuenta de Google. Intenta nuevamente.", "danger")
+        return redirect(url_for("auth.login"))
+
+    userinfo = _fetch_google_userinfo(access_token)
+    if not userinfo:
+        flash("No pudimos obtener tus datos de Google. Intenta nuevamente.", "danger")
+        return redirect(url_for("auth.login"))
+
+    email = userinfo.get("email")
+    if not email:
+        flash("Tu cuenta de Google no tiene un correo disponible.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if not userinfo.get("email_verified", True):
+        flash("Tu correo de Google no está verificado. Usa una cuenta verificada.", "warning")
+        return redirect(url_for("auth.login"))
+
+    google_sub = userinfo.get("sub")
+    if not google_sub:
+        flash("No pudimos validar tu cuenta de Google.", "danger")
+        return redirect(url_for("auth.login"))
+
+    user = User.query.filter_by(email=email).first()
+    if user:
+        if user.google_sub and user.google_sub != google_sub:
+            flash(
+                "Ya existe una cuenta con este correo asociada a otro inicio de sesión de Google. Usa la misma cuenta o contáctanos.",
+                "danger",
+            )
+            return redirect(url_for("auth.login"))
+        user.google_sub = google_sub
+        if not user.name or user.name == user.email:
+            full_name = userinfo.get("name")
+            if full_name:
+                user.name = full_name
+        if not user.email_confirmed_at:
+            user.email_confirmed_at = datetime.now(timezone.utc)
+        if not user.is_active():
+            user.activate()
+    else:
+        full_name = userinfo.get("name") or email
+        user = User(
+            email=email,
+            name=full_name,
+            google_sub=google_sub,
+        )
+        user.set_password(secrets.token_urlsafe(32))
+        user.activate()
+        user.email_confirmed_at = datetime.now(timezone.utc)
+        db.session.add(user)
+
+    try:
+        _finalize_login(user)
+    except Exception as exc:
+        current_app.logger.error("Error guardando sesión de Google para %s: %s", email, exc, exc_info=True)
+        db.session.rollback()
+        flash("No pudimos completar el inicio de sesión con Google. Intenta nuevamente.", "danger")
+        return redirect(url_for("auth.login"))
+
+    next_url = session.pop("google_oauth_next", None)
+    if next_url and urlparse(next_url).netloc == "":
+        return redirect(next_url)
+
+    if user.is_admin:
+        return redirect(url_for("admin.dashboard"))
+    if user.guardian_profile:
+        return redirect(url_for("portal.dashboard"))
+
     return redirect(url_for("core.home"))
 
 def _get_serializer() -> URLSafeTimedSerializer:

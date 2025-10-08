@@ -1,5 +1,4 @@
 import math
-import secrets
 from datetime import datetime, timezone
 from flask import (
     Blueprint,
@@ -11,6 +10,7 @@ from flask import (
     session,
     url_for,
 )
+from flask_login import current_user
 from .forms import InscriptionForm, ChildForm
 from .models import User, Plan, Workshop, BillingCycle, PaymentMethod, KnowledgeLevel, Subscription
 from .extensions import db, mail
@@ -74,7 +74,16 @@ def send_initial_password_email(user: User, token: str, plan: Plan):
 def inscripcion(plan_id):
 
     plan = Plan.query.get_or_404(plan_id)
+    if not current_user.is_authenticated:
+        flash(
+            "Debes iniciar sesión con tu cuenta de Google antes de completar la inscripción.",
+            "info",
+        )
+        return redirect(url_for("auth.google_start", next=request.url))
+
     form = InscriptionForm()
+    form.guardian_email.data = current_user.email
+    form.guardian_name.data = current_user.name
 
     # Ajustar cantidad de subformularios de niños según el plan
     while len(form.children) < plan.max_children:
@@ -91,29 +100,17 @@ def inscripcion(plan_id):
     billing_param = (request.args.get("billing") or "").lower()
     billing_cycle = BillingCycle.quarterly if billing_param == "quarterly" else BillingCycle.monthly
 
+    if current_user.guardian_profile:
+        flash(
+            "Ya existe una inscripción asociada a tu cuenta. Contáctanos si necesitas actualizarla.",
+            "warning",
+        )
+        return render_template("inscripcion.html", form=form, plan=plan, billing_cycle=billing_cycle)
+
     if form.validate_on_submit():
-        # Validar si ya existe un usuario con ese correo
-        existing_user = User.query.filter_by(email=form.guardian_email.data).first()
-        if existing_user:
-            flash(
-                "⚠️ Ya existe una inscripción con este correo. Contáctanos si deseas agregar otro hijo o cambiar tu plan.",
-                "warning",
-            )
-            return render_template("inscripcion.html", form=form, plan=plan, billing_cycle=billing_cycle)
+        user = current_user
 
         try:
-            # Crear User inactivo hasta confirmar
-            placeholder_password = secrets.token_urlsafe(32)
-
-            user = User(name=form.guardian_name.data, email=form.guardian_email.data)
-            user.set_password(placeholder_password)
-            user.deactivate()
-            db.session.add(user)
-            db.session.flush()
-
-            token = _generate_initial_password_token(user)
-            user.set_password_reset_token(token)
-
             # Guardian
             guardian = guardian_service.create_guardian(
                 user=user,
@@ -163,26 +160,20 @@ def inscripcion(plan_id):
 
             db.session.commit()  # ✅ commit antes de redirigir
 
-            send_initial_password_email(user, token, plan)
-
             if method == PaymentMethod.webpay:
                 session["webpay_inscription"] = {
                     "order_id": order.id,
-                    "temporary_password": placeholder_password,
-                    "guardian_email": form.guardian_email.data,
-                    "plan_id": plan.id,
-                    "billing_cycle": billing_cycle.name,
                 }
                 return redirect(url_for("orders.start_webpay", order_id=order.id))
 
             flash(
-                "✅ Inscripción creada correctamente. Revisa tu correo para confirmar la cuenta y definir tu contraseña.",
+                "✅ Inscripción creada correctamente.",
                 "success",
             )
 
             return render_template(
                 "inscripcion_confirmacion.html",
-                guardian_email=form.guardian_email.data,
+                guardian_email=user.email,
                 plan=plan,
                 order=order,
                 billing_cycle=billing_cycle,

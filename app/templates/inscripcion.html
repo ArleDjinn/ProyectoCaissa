@@ -4,6 +4,11 @@
 {% block content %}
 <div class="container p-t-40 p-b-40">
     <h2>Formulario de inscripción</h2>
+    {% if current_user.is_authenticated %}
+    <div class="alert alert-info" role="alert">
+        Iniciaste sesión como <strong>{{ current_user.email }}</strong>. Estos datos se usarán para crear tu cuenta de apoderado.
+    </div>
+    {% endif %}
     <form method="post">
         {{ form.hidden_tag() }}
 
@@ -16,11 +21,8 @@
         <input type="hidden" name="plan_id" value="{{ plan.id }}">
 
         <h4>Datos del apoderado</h4>
-        {{ form.guardian_name.label }} {{ form.guardian_name(class="form-control") }}<br>
-        {{ form.guardian_email.label }} {{ form.guardian_email(class="form-control") }}
-        <small class="form-text text-muted d-block mb-2">
-            Al finalizar verás una contraseña temporal para acceder al portal de apoderados.
-        </small>
+        {{ form.guardian_name.label }} {{ form.guardian_name(class="form-control", readonly=true) }}<br>
+        {{ form.guardian_email.label }} {{ form.guardian_email(class="form-control", readonly=true) }}
         {{ form.phone.label }} {{ form.phone(class="form-control") }}<br>
         {{ form.allow_whatsapp_group() }} {{ form.allow_whatsapp_group.label }}<br>
 
@@ -40,7 +42,8 @@
         {% for value, label in form.workshops.choices %}
             <div class="form-check">
                 <input class="form-check-input" type="checkbox"
-                       name="workshops" value="{{ value }}" id="workshop{{ value }}">
+                       name="workshops" value="{{ value }}" id="workshop{{ value }}"
+                       {% if form.workshops.data and value in form.workshops.data %}checked{% endif %}>
                 <label class="form-check-label" for="workshop{{ value }}">
                     {{ label }}
                 </label>
