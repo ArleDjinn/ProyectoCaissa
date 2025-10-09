@@ -3,7 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask
 
-from .extensions import db, migrate, csrf, login_manager, mail
+from .extensions import db, migrate, csrf, login_manager, mail, oauth
 from .models import User
 from . import admin, inscriptions, orders, portal
 
@@ -21,6 +21,8 @@ def create_app(config_class="config.Config"):
     csrf.init_app(app)
     login_manager.init_app(app)
     mail.init_app(app)
+    oauth.init_app(app)
+    _register_oauth_clients(app)
 
     # Cargar usuario
     @login_manager.user_loader
@@ -43,3 +45,22 @@ def create_app(config_class="config.Config"):
         return {"current_year": datetime.now(timezone.utc).year}
 
     return app
+
+
+def _register_oauth_clients(app: Flask) -> None:
+    client_id = app.config.get("GOOGLE_CLIENT_ID")
+    client_secret = app.config.get("GOOGLE_CLIENT_SECRET")
+    discovery_url = app.config.get("GOOGLE_DISCOVERY_URL")
+
+    if not client_id or not client_secret:
+        return
+
+    oauth.register(
+        name="google",
+        client_id=client_id,
+        client_secret=client_secret,
+        server_metadata_url=discovery_url,
+        client_kwargs={
+            "scope": "openid email profile",
+        },
+    )

@@ -4,7 +4,7 @@ import os
 import secrets
 import socket
 from contextlib import contextmanager
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint,
@@ -17,7 +17,15 @@ from flask import (
     session,
 )
 from flask_login import login_user, logout_user, login_required
-import requests
+
+try:  # pragma: no cover - dependencia opcional
+    from authlib.integrations.base_client.errors import OAuthError
+except ModuleNotFoundError:  # pragma: no cover - fallback cuando Authlib no está disponible
+
+    class OAuthError(Exception):
+        """Excepción base para errores de OAuth cuando Authlib no está instalado."""
+
+        pass
 from .models import User
 from .forms import (
     LoginForm,
@@ -26,7 +34,7 @@ from .forms import (
     PasswordResetForm,
 )
 from datetime import datetime, timezone
-from .extensions import db, mail
+from .extensions import db, mail, oauth
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from flask_mail import Message
 
@@ -34,13 +42,6 @@ bp = Blueprint("auth", __name__, template_folder="templates")
 
 INITIAL_PASSWORD_PURPOSE = "initial-password"
 PASSWORD_RESET_PURPOSE = "password-reset"
-
-GOOGLE_OAUTH_SCOPES = [
-    "openid",
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile",
-]
-
 
 def _google_configured() -> bool:
     return bool(
@@ -58,84 +59,24 @@ def _allow_insecure_transport_if_needed() -> None:
         os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
 
-def _build_google_authorization_url(state: str) -> str:
-    params = {
-        "client_id": current_app.config["GOOGLE_CLIENT_ID"],
-        "response_type": "code",
-        "scope": " ".join(GOOGLE_OAUTH_SCOPES),
-        "redirect_uri": url_for("auth.google_callback", _external=True),
-        "access_type": "offline",
-        "include_granted_scopes": "true",
-        "prompt": "select_account",
-        "state": state,
-    }
-    return f"{current_app.config['GOOGLE_AUTHORIZATION_ENDPOINT']}?{urlencode(params)}"
-
-
-def _exchange_code_for_token(code: str) -> dict | None:
-    data = {
-        "code": code,
-        "client_id": current_app.config["GOOGLE_CLIENT_ID"],
-        "client_secret": current_app.config["GOOGLE_CLIENT_SECRET"],
-        "redirect_uri": url_for("auth.google_callback", _external=True),
-        "grant_type": "authorization_code",
-    }
-    timeout = current_app.config.get("GOOGLE_HTTP_TIMEOUT", 10)
-    try:
-        response = requests.post(
-            current_app.config["GOOGLE_TOKEN_ENDPOINT"],
-            data=data,
-            timeout=timeout,
-        )
-    except requests.RequestException as exc:
-        current_app.logger.error("Error solicitando token de Google: %s", exc, exc_info=True)
-        return None
-
-    if response.status_code >= 400:
-        current_app.logger.error(
-            "Google devolvió un error al intercambiar el código: %s %s",
-            response.status_code,
-            response.text,
-        )
-        return None
-
-    return response.json()
-
-
-def _fetch_google_userinfo(access_token: str) -> dict | None:
-    timeout = current_app.config.get("GOOGLE_HTTP_TIMEOUT", 10)
-    headers = {"Authorization": f"Bearer {access_token}"}
-    try:
-        response = requests.get(
-            current_app.config["GOOGLE_USERINFO_ENDPOINT"],
-            headers=headers,
-            timeout=timeout,
-        )
-    except requests.RequestException as exc:
-        current_app.logger.error("Error consultando datos de Google: %s", exc, exc_info=True)
-        return None
-
-    if response.status_code >= 400:
-        current_app.logger.error(
-            "Google devolvió un error al obtener los datos del usuario: %s %s",
-            response.status_code,
-            response.text,
-        )
-        return None
-
-    return response.json()
-
-
 def _finalize_login(user: User) -> None:
     login_user(user)
     user.previous_login_at = user.last_login_at
     user.last_login_at = datetime.now(timezone.utc)
     db.session.commit()
 
+
+def _get_google_client():
+    google = oauth.create_client("google")
+    if google is None:
+        current_app.logger.error("No se pudo crear el cliente de Google OAuth.")
+    return google
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
     next_param = request.args.get("next")
+    show_google_help = bool(request.args.get("show_google_help"))
     google_login_url = None
     if _google_configured():
         if next_param:
@@ -181,7 +122,12 @@ def login():
             flash("Tu cuenta no tiene un portal asignado. Contáctanos para recibir ayuda.", "warning")
             return redirect(url_for("core.home"))
         flash("Credenciales inválidas", "danger")
-    return render_template("login.html", form=form, google_login_url=google_login_url)
+    return render_template(
+        "login.html",
+        form=form,
+        google_login_url=google_login_url,
+        show_google_help=show_google_help,
+    )
 
 @bp.route("/logout")
 @login_required
@@ -202,6 +148,14 @@ def google_start():
 
     _allow_insecure_transport_if_needed()
 
+    google = _get_google_client()
+    if google is None:
+        flash(
+            "La autenticación con Google no está disponible en este momento.",
+            "danger",
+        )
+        return redirect(url_for("auth.login"))
+
     next_url = request.args.get("next")
     if next_url and urlparse(next_url).netloc != "":
         next_url = url_for("core.home")
@@ -214,12 +168,27 @@ def google_start():
 
     session["google_oauth_next"] = next_url or referrer or url_for("core.home")
 
-    state = secrets.token_urlsafe(32)
-    session["google_oauth_state"] = state
-    authorization_url = _build_google_authorization_url(state)
-    return redirect(authorization_url)
+    redirect_uri = (
+        current_app.config.get("GOOGLE_REDIRECT_URI")
+        or url_for("auth.google_callback", _external=True)
+    )
+
+    try:
+        return google.authorize_redirect(
+            redirect_uri,
+            prompt="select_account",
+            access_type="offline",
+            include_granted_scopes="true",
+        )
+    except (OAuthError, Exception) as exc:
+        current_app.logger.error(
+            "Error iniciando el flujo OAuth de Google: %s", exc, exc_info=True
+        )
+        flash("No pudimos redirigirte a Google. Intenta nuevamente.", "danger")
+        return redirect(url_for("auth.login"))
 
 
+@bp.route("/callback")
 @bp.route("/google/callback")
 def google_callback():
     if not _google_configured():
@@ -228,29 +197,53 @@ def google_callback():
 
     _allow_insecure_transport_if_needed()
 
-    stored_state = session.pop("google_oauth_state", None)
-    incoming_state = request.args.get("state")
-    if not stored_state or stored_state != incoming_state:
-        flash("No pudimos validar tu inicio de sesión con Google. Intenta nuevamente.", "danger")
+    google = _get_google_client()
+    if google is None:
+        flash("La autenticación con Google no está disponible en este momento.", "danger")
         return redirect(url_for("auth.login"))
 
-    code = request.args.get("code")
-    if not code:
-        flash("Falta el código de autorización de Google.", "danger")
+    try:
+        token_data = google.authorize_access_token()
+    except (OAuthError, Exception) as exc:
+        current_app.logger.error(
+            "Google rechazó el intercambio de código: %s", exc, exc_info=True
+        )
+        flash("No pudimos autenticar tu cuenta de Google. Intenta nuevamente.", "danger")
         return redirect(url_for("auth.login"))
 
-    token_data = _exchange_code_for_token(code)
     if not token_data:
         flash("No pudimos autenticar tu cuenta de Google. Intenta nuevamente.", "danger")
         return redirect(url_for("auth.login"))
 
-    access_token = token_data.get("access_token")
-    if not access_token:
-        current_app.logger.error("Respuesta de Google sin access_token: %s", token_data)
-        flash("No pudimos autenticar tu cuenta de Google. Intenta nuevamente.", "danger")
-        return redirect(url_for("auth.login"))
+    userinfo = token_data.get("userinfo")
 
-    userinfo = _fetch_google_userinfo(access_token)
+    if not userinfo and "id_token" in token_data:
+        try:
+            userinfo = google.parse_id_token(token_data)
+        except Exception as exc:  # noqa: BLE001 - queremos registrar cualquier problema
+            current_app.logger.error(
+                "Error analizando el id_token de Google: %s", exc, exc_info=True
+            )
+
+    if not userinfo:
+        try:
+            response = google.get("userinfo")
+        except (OAuthError, Exception) as exc:
+            current_app.logger.error(
+                "Error consultando datos de usuario en Google: %s", exc, exc_info=True
+            )
+            response = None
+
+        if response is not None and response.ok:
+            try:
+                userinfo = response.json()
+            except ValueError as exc:  # pragma: no cover - librería externa
+                current_app.logger.error(
+                    "Error parseando la respuesta de userinfo de Google: %s",
+                    exc,
+                    exc_info=True,
+                )
+
     if not userinfo:
         flash("No pudimos obtener tus datos de Google. Intenta nuevamente.", "danger")
         return redirect(url_for("auth.login"))

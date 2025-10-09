@@ -87,7 +87,8 @@ def test_inscription_requires_google_login_redirects(client, app):
     response = client.get(f"/inscripcion/{plan_id}")
 
     assert response.status_code == 302
-    assert "/auth/google/start" in response.headers["Location"]
+    assert response.headers["Location"].startswith("/auth/login")
+    assert "show_google_help=1" in response.headers["Location"]
 
 
 def test_inscription_creates_guardian_for_authenticated_user(client, app):
