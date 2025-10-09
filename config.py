@@ -56,6 +56,10 @@ class Config:
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+    GOOGLE_DISCOVERY_URL = os.environ.get(
+        "GOOGLE_DISCOVERY_URL",
+        "https://accounts.google.com/.well-known/openid-configuration",
+    )
     GOOGLE_AUTHORIZATION_ENDPOINT = os.environ.get(
         "GOOGLE_AUTHORIZATION_ENDPOINT",
         "https://accounts.google.com/o/oauth2/v2/auth",
@@ -68,6 +72,7 @@ class Config:
         "GOOGLE_USERINFO_ENDPOINT",
         "https://openidconnect.googleapis.com/v1/userinfo",
     )
+    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI")
     GOOGLE_HTTP_TIMEOUT = int(os.environ.get("GOOGLE_HTTP_TIMEOUT", 10))
 
     # Tokens

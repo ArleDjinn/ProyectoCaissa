@@ -121,21 +121,20 @@
             Continuar con Google
           </a>
         </div>
-        <div class="text-center text-muted mb-3">
-          <small>Si eres apoderado, usa tu cuenta de Google para acceder.</small>
-        </div>
-        <div class="text-center text-muted mb-3"><span>— o —</span></div>
-        {% endif %}
-        <form method="post">
-          {{ form.hidden_tag() }}
+      {% endif %}
 
-          <div class="mb-3">
-            {{ form.email.label(class="form-label") }}
-            {{ form.email(class="form-control", placeholder="tucorreo@ejemplo.com") }}
-            {% for error in form.email.errors %}
-              <div class="text-danger small">{{ error }}</div>
-            {% endfor %}
-          </div>
+      <div class="form-divider"><span>o usa tu correo</span></div>
+
+      <form method="post" class="login-form" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="form-group">
+          {{ form.email.label() }}
+          {{ form.email() }}
+          {% for error in form.email.errors %}
+            <div class="form-error">{{ error }}</div>
+          {% endfor %}
+        </div>
 
               {% if google_login_url %}
               <div class="d-grid mb-4">
@@ -195,7 +194,18 @@
           </div>
         </div>
       </div>
+
+      {% if not google_login_url %}
+        <div class="alert alert-warning d-flex align-items-start gap-2 mt-2 mb-0">
+          <span aria-hidden="true" class="mt-1">⚠️</span>
+          <div>
+            Actualmente el inicio de sesión con Google no está disponible. Ponte en contacto con nosotros para activar tu cuenta manualmente.
+          </div>
+        </div>
+      {% endif %}
     </div>
   </div>
 </section>
 {% endblock %}
+
+{% block footer %}{% endblock %}
