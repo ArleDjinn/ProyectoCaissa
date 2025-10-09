@@ -10,6 +10,12 @@
       <div class="card-body">
         <h3 class="card-title mb-4 text-center">Iniciar sesión</h3>
         {% if google_login_url %}
+        {% if show_google_help %}
+        <div class="alert alert-info" role="alert">
+          <strong>¿Primera vez inscribiendo?</strong><br>
+          Usa el botón <em>Continuar con Google</em> para crear o acceder a tu cuenta. Una vez que hayas completado el proceso volveremos automáticamente a la inscripción que estabas realizando.
+        </div>
+        {% endif %}
         <div class="d-grid mb-3">
           <a class="btn btn-outline-danger" href="{{ google_login_url }}">
             Continuar con Google
