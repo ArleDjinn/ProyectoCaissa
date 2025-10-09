@@ -76,10 +76,17 @@ def inscripcion(plan_id):
     plan = Plan.query.get_or_404(plan_id)
     if not current_user.is_authenticated:
         flash(
-            "Debes iniciar sesión con tu cuenta de Google antes de completar la inscripción.",
+            "Para inscribir a tu hijo primero debes iniciar sesión con tu cuenta de Google. "
+            "Presiona \"Continuar con Google\" para crear o acceder a tu cuenta y luego volveremos a esta inscripción automáticamente.",
             "info",
         )
-        return redirect(url_for("auth.google_start", next=request.url))
+        return redirect(
+            url_for(
+                "auth.login",
+                next=request.url,
+                show_google_help="1",
+            )
+        )
 
     form = InscriptionForm()
     form.guardian_email.data = current_user.email

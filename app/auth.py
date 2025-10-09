@@ -136,6 +136,7 @@ def _finalize_login(user: User) -> None:
 def login():
     form = LoginForm()
     next_param = request.args.get("next")
+    show_google_help = bool(request.args.get("show_google_help"))
     google_login_url = None
     if _google_configured():
         if next_param:
@@ -181,7 +182,12 @@ def login():
             flash("Tu cuenta no tiene un portal asignado. Contáctanos para recibir ayuda.", "warning")
             return redirect(url_for("core.home"))
         flash("Credenciales inválidas", "danger")
-    return render_template("login.html", form=form, google_login_url=google_login_url)
+    return render_template(
+        "login.html",
+        form=form,
+        google_login_url=google_login_url,
+        show_google_help=show_google_help,
+    )
 
 @bp.route("/logout")
 @login_required
