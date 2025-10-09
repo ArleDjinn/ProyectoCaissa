@@ -172,6 +172,7 @@ def google_start():
         current_app.config.get("GOOGLE_REDIRECT_URI")
         or url_for("auth.google_callback", _external=True)
     )
+    session["google_oauth_redirect_uri"] = redirect_uri
 
     try:
         return google.authorize_redirect(
@@ -203,7 +204,11 @@ def google_callback():
         return redirect(url_for("auth.login"))
 
     try:
-        token_data = google.authorize_access_token()
+        redirect_uri = session.pop("google_oauth_redirect_uri", None) or (
+            current_app.config.get("GOOGLE_REDIRECT_URI")
+            or url_for("auth.google_callback", _external=True)
+        )
+        token_data = google.authorize_access_token(redirect_uri=redirect_uri)
     except (OAuthError, Exception) as exc:
         current_app.logger.error(
             "Google rechazó el intercambio de código: %s", exc, exc_info=True
