@@ -3,6 +3,8 @@ import sys
 from datetime import datetime, timezone
 
 import pytest
+from flask import session
+from flask_login import login_user
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -79,21 +81,33 @@ def admin_setup(app):
         db.session.commit()
 
         return {
-            "credentials": {"email": admin.email, "password": "admin-secret"},
+            "admin_id": admin.id,
             "guardian_id": guardian.id,
             "existing_child_name": existing_child.name,
         }
 
 
-def login(client, credentials):
-    return client.post("/auth/login", data=credentials, follow_redirects=True)
+def force_login(client, app, user_id: int):
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.previous_login_at = user.last_login_at
+        user.last_login_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+    with app.test_request_context("/"):
+        user = db.session.get(User, user_id)
+        login_user(user, force=True)
+        session_data = dict(session)
+
+    with client.session_transaction() as session_ctx:
+        session_ctx.clear()
+        session_ctx.update(session_data)
 
 
 def test_admin_dashboard_lists_children_created_between_logins(client, app, admin_setup):
-    credentials = admin_setup["credentials"]
+    admin_id = admin_setup["admin_id"]
 
-    first_login_response = login(client, credentials)
-    assert first_login_response.status_code == 200
+    force_login(client, app, admin_id)
 
     logout_response = client.get("/auth/logout", follow_redirects=True)
     assert logout_response.status_code == 200
@@ -105,8 +119,7 @@ def test_admin_dashboard_lists_children_created_between_logins(client, app, admi
         db.session.commit()
         new_child_name = new_child.name
 
-    second_login_response = login(client, credentials)
-    assert second_login_response.status_code == 200
+    force_login(client, app, admin_id)
 
     dashboard_response = client.get("/admin/dashboard/pagos")
     assert dashboard_response.status_code == 200

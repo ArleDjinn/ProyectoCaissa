@@ -1,8 +1,10 @@
+import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-import sys
 
 import pytest
+from flask import session
+from flask_login import login_user
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -102,19 +104,31 @@ def admin_setup(app):
         db.session.commit()
 
         return {
-            "admin_credentials": {"email": admin.email, "password": "secret"},
+            "admin_id": admin.id,
             "subscription_id": subscription.id,
             "expected_amount": plan.price_monthly,
         }
 
 
-def login(client, credentials):
-    return client.post("/auth/login", data=credentials, follow_redirects=True)
+def force_login(client, app, user_id: int):
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.previous_login_at = user.last_login_at
+        user.last_login_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+    with app.test_request_context("/"):
+        user = db.session.get(User, user_id)
+        login_user(user, force=True)
+        session_data = dict(session)
+
+    with client.session_transaction() as session_ctx:
+        session_ctx.clear()
+        session_ctx.update(session_data)
 
 
-def test_dashboard_lists_subscriptions_due(client, admin_setup):
-    response = login(client, admin_setup["admin_credentials"])
-    assert response.status_code == 200
+def test_dashboard_lists_subscriptions_due(client, app, admin_setup):
+    force_login(client, app, admin_setup["admin_id"])
 
     dashboard_response = client.get("/admin/dashboard/pagos")
     assert dashboard_response.status_code == 200
@@ -124,8 +138,7 @@ def test_dashboard_lists_subscriptions_due(client, admin_setup):
 
 
 def test_issue_subscription_order_creates_new_pending_order(client, app, admin_setup):
-    login_response = login(client, admin_setup["admin_credentials"])
-    assert login_response.status_code == 200
+    force_login(client, app, admin_setup["admin_id"])
 
     subscription_id = admin_setup["subscription_id"]
 

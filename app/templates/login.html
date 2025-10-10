@@ -32,32 +32,13 @@
     justify-content: center;
     gap: 0.5rem;
     transition: all 0.2s ease;
+    text-decoration: none;
   }
   .btn-google:hover {
     background: #f6f9ff;
     border-color: #c0d0ff;
     color: #0d47a1;
-  }
-  .auth-divider {
-    position: relative;
-    text-align: center;
-    margin: 2rem 0;
-  }
-  .auth-divider::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 100%;
-    height: 1px;
-    background: #e9ecef;
-  }
-  .auth-divider span {
-    background: #fff;
-    padding: 0 0.75rem;
-    color: #6c757d;
-    font-size: 0.75rem;
-    text-transform: uppercase;
+    text-decoration: none;
   }
 </style>
 {% endblock %}
@@ -67,9 +48,18 @@
   <div class="auth-card">
     <h3 class="text-center mb-4 fw-bold">Iniciar sesión</h3>
 
-    {# --- Opción 1: Google --- #}
+    <p class="text-muted text-center mb-4">
+      Solo permitimos acceso mediante cuentas de Google autorizadas por Proyecto Caissa.
+    </p>
+
+    {% if show_google_help %}
+    <div class="alert alert-info mb-4" role="status">
+      Presiona <strong>Continuar con Google</strong>, elige la cuenta correspondiente y volveremos automáticamente a tu flujo.
+    </div>
+    {% endif %}
+
     {% if google_login_url %}
-    <div class="d-grid mb-3">
+    <div class="d-grid">
       <a class="btn-google" href="{{ google_login_url }}">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 533.5 544.3" height="20" width="20" aria-hidden="true">
           <path fill="#4285f4" d="M533.5 278.4c0-17.4-1.5-34-4.5-50.2H272.1v95h147.3c-6.3 34.4-25 63.5-53.4 83v68h86.2c50.5-46.5 81.3-114.9 81.3-195.8z"/>
@@ -80,45 +70,10 @@
         Continuar con Google
       </a>
     </div>
-    {% endif %}
-
-    <div class="auth-divider"><span>o usa tu correo</span></div>
-
-    {# --- Opción 2: Correo --- #}
-    <form method="post" novalidate>
-      {{ form.hidden_tag() }}
-
-      <div class="mb-3">
-        {{ form.email.label(class="form-label fw-semibold") }}
-        {{ form.email(class="form-control", placeholder="tucorreo@ejemplo.com") }}
-        {% for error in form.email.errors %}
-          <div class="text-danger small">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div class="mb-3">
-        {{ form.password.label(class="form-label fw-semibold") }}
-        {{ form.password(class="form-control", placeholder="••••••••") }}
-        {% for error in form.password.errors %}
-          <div class="text-danger small">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div class="d-grid mb-3">
-        {{ form.submit(class="btn btn-primary btn-lg rounded-pill") }}
-      </div>
-
-      <div class="text-center">
-        <a class="small" href="{{ url_for('auth.request_password_reset') }}">
-          ¿Olvidaste tu contraseña?
-        </a>
-      </div>
-    </form>
-
-    {% if not google_login_url %}
+    {% else %}
     <div class="alert alert-warning d-flex align-items-start gap-2 mt-4 mb-0">
       <span aria-hidden="true" class="mt-1">⚠️</span>
-      <div>Actualmente el inicio de sesión con Google no está disponible.</div>
+      <div>El inicio de sesión con Google no está disponible en este momento. Contacta al equipo de Proyecto Caissa.</div>
     </div>
     {% endif %}
   </div>

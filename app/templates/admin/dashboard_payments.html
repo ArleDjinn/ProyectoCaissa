@@ -111,7 +111,6 @@
                     <th class="text-center">Monto</th>
                     <th class="text-center">Estado</th>
                     <th class="text-center">Pago</th>
-                    <th class="text-center">Restablecer contraseña</th>
                 </tr>
                 </thead>
         <tbody>
@@ -150,18 +149,10 @@
                       </form>
                   {% endif %}
               </td>
-                <td class="text-center">
-                    <form action="{{ url_for('admin.trigger_password_reset', user_id=order.subscription.guardian.user.id) }}"
-                          method="post" class="d-inline">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-outline-secondary btn-sm" type="submit">Enviar enlace</button>
-                    </form>
-                    <small class="text-muted d-block mt-2">Caduca en {{ reset_expiration_hours }} {{ 'hora' if reset_expiration_hours == 1 else 'horas' }}.</small>
-                </td>
             </tr>
           {% else %}
             <tr>
-              <td colspan="8" class="text-center text-muted py-4">
+              <td colspan="7" class="text-center text-muted py-4">
                   No hay órdenes pendientes de pago.
               </td>
             </tr>
@@ -189,7 +180,6 @@
                     <th class="text-center">Monto</th>
                     <th class="text-center">Método</th>
                     <th class="text-center">Estado</th>
-                    <th class="text-center">Restablecer contraseña</th>
                     <th class="text-center">Acción</th>
                 </tr>
                 </thead>
@@ -223,14 +213,6 @@
                             <span class="badge bg-success">{{ order.payment_status.value }}</span>
                         </td>
                         <td class="text-center">
-                            <form action="{{ url_for('admin.trigger_password_reset', user_id=order.subscription.guardian.user.id) }}"
-                                  method="post" class="d-inline">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button class="btn btn-outline-secondary btn-sm" type="submit">Enviar enlace</button>
-                            </form>
-                            <small class="text-muted d-block mt-2">Caduca en {{ reset_expiration_hours }} {{ 'hora' if reset_expiration_hours == 1 else 'horas' }}.</small>
-                        </td>
-                        <td class="text-center">
                             <form action="{{ url_for('orders.revert_payment', order_id=order.id) }}"
                                   method="post" class="d-inline"
                                   onsubmit="return confirm('¿Revertir el pago?');">
@@ -241,7 +223,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="8" class="text-center text-muted py-4">
                             No hay órdenes pagadas registradas.
                         </td>
                     </tr>
