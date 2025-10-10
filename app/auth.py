@@ -241,6 +241,10 @@ def google_callback():
         user.email_confirmed_at = datetime.now(timezone.utc)
         db.session.add(user)
 
+    if not user.id:
+        db.session.flush()
+        db.session.commit()
+
     try:
         _finalize_login(user)
     except Exception as exc:
