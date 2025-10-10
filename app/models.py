@@ -90,6 +90,7 @@ class User(UserMixin, UtcTimestampMixin, db.Model):
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
 
+    @property
     def is_active(self):
         return bool(self._is_active)
 

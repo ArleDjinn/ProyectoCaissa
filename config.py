@@ -1,6 +1,5 @@
 import os
 
-
 def _env_bool(key: str, default: bool = False) -> bool:
     value = os.environ.get(key)
     if value is None:
@@ -62,6 +61,9 @@ class Config:
     SESSION_COOKIE_SECURE = _env_bool(
         "SESSION_COOKIE_SECURE", _DEFAULT_PRODUCTION
     )
+
+    REMEMBER_COOKIE_SECURE = _env_bool("REMEMBER_COOKIE_SECURE", True)
+
     SESSION_COOKIE_SAMESITE = os.environ.get(
         "SESSION_COOKIE_SAMESITE",
         "None" if SESSION_COOKIE_SECURE else "Lax",

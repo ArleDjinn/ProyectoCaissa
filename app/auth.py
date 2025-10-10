@@ -182,11 +182,13 @@ def google_callback():
         user.name = userinfo.get("name") or user.name
         user.email_confirmed_at = user.email_confirmed_at or datetime.now(timezone.utc)
         user.activate()
+        db.session.commit()
     else:
         user = User(
             email=email,
             name=userinfo.get("name") or email,
             google_sub=userinfo.get("sub"),
+            _is_active=True,
         )
         user.set_password(secrets.token_urlsafe(32))
         user.activate()
