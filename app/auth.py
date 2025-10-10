@@ -188,108 +188,53 @@ def google_start():
         flash("No pudimos redirigirte a Google. Intenta nuevamente.", "danger")
         return redirect(url_for("auth.login"))
 
-
 @bp.route("/callback")
 @bp.route("/google/callback")
 def google_callback():
     if not _google_configured():
-        flash("La autenticación con Google no está disponible en este momento.", "danger")
+        flash("La autenticación con Google no está disponible.", "danger")
         return redirect(url_for("auth.login"))
 
     _allow_insecure_transport_if_needed()
 
     google = _get_google_client()
-    if google is None:
-        flash("La autenticación con Google no está disponible en este momento.", "danger")
+    if not google:
+        flash("No se pudo conectar con Google.", "danger")
         return redirect(url_for("auth.login"))
 
     try:
-        redirect_uri = session.pop("google_oauth_redirect_uri", None) or (
-            current_app.config.get("GOOGLE_REDIRECT_URI")
-            or url_for("auth.google_callback", _external=True)
-        )
-        token_data = google.authorize_access_token(redirect_uri=redirect_uri)
-    except (OAuthError, Exception) as exc:
-        current_app.logger.error(
-            "Google rechazó el intercambio de código: %s", exc, exc_info=True
-        )
+        token_data = google.authorize_access_token()
+    except Exception as exc:
+        current_app.logger.error("Error al autorizar token de Google: %s", exc, exc_info=True)
         flash("No pudimos autenticar tu cuenta de Google. Intenta nuevamente.", "danger")
         return redirect(url_for("auth.login"))
 
-    if not token_data:
-        flash("No pudimos autenticar tu cuenta de Google. Intenta nuevamente.", "danger")
+    userinfo = (
+        token_data.get("userinfo")
+        or google.parse_id_token(token_data)
+        or google.get("userinfo").json()
+    )
+
+    if not userinfo or not userinfo.get("email"):
+        flash("No pudimos obtener tus datos de Google.", "danger")
         return redirect(url_for("auth.login"))
 
-    userinfo = token_data.get("userinfo")
-
-    if not userinfo and "id_token" in token_data:
-        try:
-            userinfo = google.parse_id_token(token_data)
-        except Exception as exc:  # noqa: BLE001 - queremos registrar cualquier problema
-            current_app.logger.error(
-                "Error analizando el id_token de Google: %s", exc, exc_info=True
-            )
-
-    if not userinfo:
-        try:
-            response = google.get("userinfo")
-        except (OAuthError, Exception) as exc:
-            current_app.logger.error(
-                "Error consultando datos de usuario en Google: %s", exc, exc_info=True
-            )
-            response = None
-
-        if response is not None and response.ok:
-            try:
-                userinfo = response.json()
-            except ValueError as exc:  # pragma: no cover - librería externa
-                current_app.logger.error(
-                    "Error parseando la respuesta de userinfo de Google: %s",
-                    exc,
-                    exc_info=True,
-                )
-
-    if not userinfo:
-        flash("No pudimos obtener tus datos de Google. Intenta nuevamente.", "danger")
-        return redirect(url_for("auth.login"))
-
-    email = userinfo.get("email")
-    if not email:
-        flash("Tu cuenta de Google no tiene un correo disponible.", "danger")
-        return redirect(url_for("auth.login"))
-
+    email = userinfo["email"]
     if not userinfo.get("email_verified", True):
-        flash("Tu correo de Google no está verificado. Usa una cuenta verificada.", "warning")
-        return redirect(url_for("auth.login"))
-
-    google_sub = userinfo.get("sub")
-    if not google_sub:
-        flash("No pudimos validar tu cuenta de Google.", "danger")
+        flash("Tu correo de Google no está verificado.", "warning")
         return redirect(url_for("auth.login"))
 
     user = User.query.filter_by(email=email).first()
     if user:
-        if user.google_sub and user.google_sub != google_sub:
-            flash(
-                "Ya existe una cuenta con este correo asociada a otro inicio de sesión de Google. Usa la misma cuenta o contáctanos.",
-                "danger",
-            )
-            return redirect(url_for("auth.login"))
-        user.google_sub = google_sub
-        if not user.name or user.name == user.email:
-            full_name = userinfo.get("name")
-            if full_name:
-                user.name = full_name
-        if not user.email_confirmed_at:
-            user.email_confirmed_at = datetime.now(timezone.utc)
-        if not user.is_active():
-            user.activate()
+        user.google_sub = userinfo.get("sub")
+        user.name = userinfo.get("name") or user.name
+        user.email_confirmed_at = user.email_confirmed_at or datetime.now(timezone.utc)
+        user.activate()
     else:
-        full_name = userinfo.get("name") or email
         user = User(
             email=email,
-            name=full_name,
-            google_sub=google_sub,
+            name=userinfo.get("name") or email,
+            google_sub=userinfo.get("sub"),
         )
         user.set_password(secrets.token_urlsafe(32))
         user.activate()
@@ -299,20 +244,18 @@ def google_callback():
     try:
         _finalize_login(user)
     except Exception as exc:
-        current_app.logger.error("Error guardando sesión de Google para %s: %s", email, exc, exc_info=True)
+        current_app.logger.error("Error guardando sesión Google para %s: %s", email, exc, exc_info=True)
         db.session.rollback()
-        flash("No pudimos completar el inicio de sesión con Google. Intenta nuevamente.", "danger")
+        flash("Error interno al crear la sesión.", "danger")
         return redirect(url_for("auth.login"))
 
     next_url = session.pop("google_oauth_next", None)
     if next_url and urlparse(next_url).netloc == "":
         return redirect(next_url)
-
     if user.is_admin:
         return redirect(url_for("admin.dashboard"))
     if user.guardian_profile:
         return redirect(url_for("portal.dashboard"))
-
     return redirect(url_for("core.home"))
 
 def _get_serializer() -> URLSafeTimedSerializer:
