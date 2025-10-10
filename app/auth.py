@@ -60,10 +60,10 @@ def _allow_insecure_transport_if_needed() -> None:
 
 
 def _finalize_login(user: User) -> None:
-    login_user(user)
     user.previous_login_at = user.last_login_at
     user.last_login_at = datetime.now(timezone.utc)
     db.session.commit()
+    login_user(user)
 
 
 def _get_google_client():
