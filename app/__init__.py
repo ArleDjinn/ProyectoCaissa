@@ -27,7 +27,14 @@ def create_app(config_class="config.Config"):
     # Cargar usuario
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        """Carga segura del usuario activo para Flask-Login."""
+        if not user_id:
+            return None
+        try:
+            return User.query.get(int(user_id))
+        except (TypeError, ValueError):
+            # Si la cookie guarda algo no convertible (ej. "None"), ignora la sesión
+            return None
 
     # Registrar blueprints
     from . import routes, auth, admin
