@@ -19,6 +19,14 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    MAIL_PROVIDER = os.environ.get("MAIL_PROVIDER")
+    MAIL_SERVER = os.environ.get("MAIL_SERVER")
+    MAIL_PORT = (
+        int(os.environ.get("MAIL_PORT")) if os.environ.get("MAIL_PORT") else None
+    )
+    MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", False)
+    MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", False)
+
     # Webpay
     TBK_ENV = os.environ.get("TBK_ENV", "integration")
     TBK_COMMERCE_CODE = os.environ.get("TBK_COMMERCE_CODE")
@@ -55,3 +63,10 @@ class Config:
     INITIAL_PASSWORD_TOKEN_MAX_AGE = int(
         os.environ.get("INITIAL_PASSWORD_TOKEN_MAX_AGE", 60 * 60 * 24 * 7)
     )
+
+
+if Config.MAIL_PROVIDER == "google_workspace":
+    Config.MAIL_SERVER = Config.MAIL_SERVER or "smtp.gmail.com"
+    Config.MAIL_PORT = Config.MAIL_PORT or 465
+    Config.MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", False)
+    Config.MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", True)

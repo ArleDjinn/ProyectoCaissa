@@ -1,8 +1,6 @@
-import math
 from datetime import datetime, timezone
 from flask import (
     Blueprint,
-    current_app,
     flash,
     redirect,
     render_template,
@@ -12,63 +10,15 @@ from flask import (
 )
 from flask_login import current_user
 from .forms import InscriptionForm, ChildForm
-from .models import User, Plan, Workshop, BillingCycle, PaymentMethod, KnowledgeLevel, Subscription
-from .extensions import db, mail
+from .models import Plan, Workshop, BillingCycle, PaymentMethod, KnowledgeLevel, Subscription
+from .extensions import db
 from .services import guardians as guardian_service
 from .services import subscriptions as subscription_service
 from .services import enrollments as enrollment_service
 from .services import orders as order_service
 from sqlalchemy.exc import SQLAlchemyError
-from itsdangerous import URLSafeTimedSerializer
-from flask_mail import Message
 
 bp = Blueprint("inscriptions", __name__, template_folder="templates")
-
-def _get_serializer() -> URLSafeTimedSerializer:
-    secret_key = current_app.config["SECRET_KEY"]
-    salt = current_app.config["INITIAL_PASSWORD_TOKEN_SALT"]
-    return URLSafeTimedSerializer(secret_key, salt=salt)
-
-def _generate_initial_password_token(user: User) -> str:
-    serializer = _get_serializer()
-    return serializer.dumps({"user_id": user.id, "purpose": "initial-password"})
-
-def send_initial_password_email(user: User, token: str, plan: Plan):
-    confirm_url = url_for("auth.confirm_initial_password", token=token, _external=True)
-    max_age = current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"]
-    expiration_hours = max(1, math.ceil(max_age / 3600))
-    msg = Message(
-        subject="Confirma tu acceso a Proyecto Caissa",
-        recipients=[user.email],
-    )
-    msg.body = render_template(
-        "emails/initial_password.txt",
-        user=user,
-        plan=plan,
-        confirm_url=confirm_url,
-        expiration_hours=expiration_hours,
-    )
-    msg.html = render_template(
-        "emails/initial_password.html",
-        user=user,
-        plan=plan,
-        confirm_url=confirm_url,
-        expiration_hours=expiration_hours,
-    )
-    try:
-        mail.send(msg)
-    except Exception as exc:
-        current_app.logger.error(
-            "Error enviando correo de contraseña inicial a %s: %s",
-            user.email,
-            exc,
-            exc_info=True,
-        )
-        flash(
-            "No pudimos enviar el correo de confirmación en este momento. "
-            "Te contactaremos manualmente o inténtalo nuevamente más tarde.",
-            "warning",
-        )
 
 @bp.route("/inscripcion/<int:plan_id>", methods=["GET", "POST"])
 def inscripcion(plan_id):

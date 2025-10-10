@@ -2,7 +2,6 @@ from flask_wtf import FlaskForm
 from wtforms import (
     Form,
     StringField,
-    PasswordField,
     IntegerField,
     BooleanField,
     TimeField,
@@ -19,16 +18,9 @@ from wtforms.validators import (
     Email,
     NumberRange,
     Optional,
-    EqualTo,
-    Length,
     Regexp,
 )
 from .models import DayOfWeek, KnowledgeLevel, PaymentMethod
-
-class LoginForm(FlaskForm):
-    email = StringField("Email", validators=[DataRequired(), Email()])
-    password = PasswordField("Contraseña", validators=[DataRequired()])
-    submit = SubmitField("Ingresar")
 
 class PlanForm(FlaskForm):
     name = StringField("Nombre", validators=[DataRequired()])
@@ -136,36 +128,3 @@ class InscriptionForm(FlaskForm):
     workshops = SelectMultipleField("Talleres", coerce=int, validators=[DataRequired()])
 
     submit = SubmitField("Inscribir")
-
-class InitialPasswordForm(FlaskForm):
-    password = PasswordField(
-        "Nueva contraseña",
-        validators=[DataRequired(), Length(min=8, message="Debe tener al menos 8 caracteres.")],
-    )
-    confirm_password = PasswordField(
-        "Confirmar contraseña",
-        validators=[
-            DataRequired(),
-            EqualTo("password", message="Las contraseñas deben coincidir."),
-        ],
-    )
-    submit = SubmitField("Guardar contraseña")
-
-class PasswordResetRequestForm(FlaskForm):
-    email = StringField("Correo electrónico", validators=[DataRequired(), Email()])
-    submit = SubmitField("Enviar instrucciones")
-
-
-class PasswordResetForm(FlaskForm):
-    password = PasswordField(
-        "Nueva contraseña",
-        validators=[DataRequired(), Length(min=8, message="Debe tener al menos 8 caracteres.")],
-    )
-    confirm_password = PasswordField(
-        "Confirmar contraseña",
-        validators=[
-            DataRequired(),
-            EqualTo("password", message="Las contraseñas deben coincidir."),
-        ],
-    )
-    submit = SubmitField("Actualizar contraseña")

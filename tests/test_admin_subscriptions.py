@@ -1,8 +1,10 @@
+import sys
 from datetime import date, datetime, time, timezone
 from pathlib import Path
-import sys
 
 import pytest
+from flask import session
+from flask_login import login_user
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -126,7 +128,7 @@ def admin_data(app):
         db.session.commit()
 
         return {
-            "admin_credentials": {"email": admin.email, "password": "secret"},
+            "admin_id": admin.id,
             "subscription_id": subscription.id,
             "guardian_id": guardian.id,
             "child_id": child.id,
@@ -134,13 +136,25 @@ def admin_data(app):
         }
 
 
-def login(client, credentials):
-    return client.post("/auth/login", data=credentials, follow_redirects=True)
+def force_login(client, app, user_id: int):
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.previous_login_at = user.last_login_at
+        user.last_login_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+    with app.test_request_context("/"):
+        user = db.session.get(User, user_id)
+        login_user(user, force=True)
+        session_data = dict(session)
+
+    with client.session_transaction() as session_ctx:
+        session_ctx.clear()
+        session_ctx.update(session_data)
 
 
 def test_full_subscription_flow(client, app, admin_data):
-    login_response = login(client, admin_data["admin_credentials"])
-    assert login_response.status_code == 200
+    force_login(client, app, admin_data["admin_id"])
 
     list_response = client.get("/admin/dashboard/subscriptions")
     assert list_response.status_code == 200

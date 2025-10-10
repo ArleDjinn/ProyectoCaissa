@@ -1,9 +1,8 @@
 # app/admin.py
-import math
 import calendar
 from datetime import date
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 
@@ -39,7 +38,6 @@ from .models import (
     KnowledgeLevel,
 )
 from .extensions import db
-from .auth import generate_password_reset_token, send_password_reset_email
 
 bp = Blueprint("admin", __name__, template_folder="templates")
 
@@ -163,17 +161,12 @@ def dashboard_payments():
 
     subscriptions_due.sort(key=lambda item: (item["due_date"], item["subscription"].id))
 
-    reset_expiration_hours = max(
-        1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600)
-    )
-
     return render_template(
         "admin/dashboard_payments.html",
         pending_orders=pending_orders,
         paid_orders=paid_orders,
         new_children=new_children,
         last_login=last_login,
-        reset_expiration_hours=reset_expiration_hours,
         subscriptions_due=subscriptions_due,
     )
 
@@ -227,39 +220,6 @@ def issue_subscription_order(subscription_id):
 
     return redirect(url_for("admin.dashboard_payments"))
 
-
-@bp.route("/usuarios/<int:user_id>/reset-password", methods=["POST"])
-@login_required
-def trigger_password_reset(user_id):
-    user = User.query.get_or_404(user_id)
-    token = generate_password_reset_token(user)
-    user.set_password_reset_token(token)
-    db.session.commit()
-    try:
-        send_password_reset_email(user, token)
-    except (Exception, SystemExit) as exc:
-        current_app.logger.error(
-            "Error enviando correo de restablecimiento a %s: %s",
-            user.email,
-            exc,
-            exc_info=True,
-        )
-        flash(
-            "No pudimos enviar el correo de restablecimiento en este momento. "
-            "Contacta manualmente al usuario o inténtalo nuevamente más tarde.",
-            "warning",
-        )
-    else:
-        expiration_hours = max(1, math.ceil(current_app.config["INITIAL_PASSWORD_TOKEN_MAX_AGE"] / 3600))
-        hours_label = "hora" if expiration_hours == 1 else "horas"
-        flash(
-            f"Se envió un enlace de restablecimiento a {user.email}. Caduca en {expiration_hours} {hours_label}.",
-            "info",
-        )
-        current_app.logger.info(
-            "Admin %s solicitó restablecimiento de contraseña para %s", current_user.email, user.email
-        )
-    return redirect(request.referrer or url_for("admin.dashboard_payments"))
 
 # --- Suscripciones ---
 @bp.route("/dashboard/subscriptions")

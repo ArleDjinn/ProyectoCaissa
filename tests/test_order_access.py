@@ -1,8 +1,10 @@
-from pathlib import Path
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
+from flask import session
+from flask_login import login_user
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -111,44 +113,54 @@ def order_context(app):
 
         return {
             "order_id": order.id,
-            "owner": {"email": owner_user.email, "password": "owner-secret"},
-            "intruder": {"email": other_user.email, "password": "intruder-secret"},
-            "admin": {"email": admin_user.email, "password": "admin-secret"},
-            "outsider": {"email": outsider_user.email, "password": "outsider-secret"},
+            "owner_id": owner_user.id,
+            "intruder_id": other_user.id,
+            "admin_id": admin_user.id,
             "outsider_id": outsider_user.id,
         }
 
 
-def login(client, credentials):
-    return client.post("/auth/login", data=credentials, follow_redirects=True)
+def force_login(client, app, user_id: int):
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        user.previous_login_at = user.last_login_at
+        user.last_login_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+    with app.test_request_context("/"):
+        user = db.session.get(User, user_id)
+        login_user(user, force=True)
+        session_data = dict(session)
+
+    with client.session_transaction() as session_ctx:
+        session_ctx.clear()
+        session_ctx.update(session_data)
 
 
-def test_order_owner_can_access_detail(client, order_context):
-    login(client, order_context["owner"])
+def test_order_owner_can_access_detail(client, app, order_context):
+    force_login(client, app, order_context["owner_id"])
 
     response = client.get(f"/pago/{order_context['order_id']}")
     assert response.status_code == 200
     assert f"Orden #{order_context['order_id']}".encode() in response.data
 
 
-def test_other_guardian_gets_403(client, order_context):
-    login(client, order_context["intruder"])
+def test_other_guardian_gets_403(client, app, order_context):
+    force_login(client, app, order_context["intruder_id"])
 
     response = client.get(f"/pago/{order_context['order_id']}")
     assert response.status_code == 403
 
 
-def test_admin_can_access_any_order(client, order_context):
-    login(client, order_context["admin"])
+def test_admin_can_access_any_order(client, app, order_context):
+    force_login(client, app, order_context["admin_id"])
 
     response = client.get(f"/pago/{order_context['order_id']}")
     assert response.status_code == 200
 
 
-def test_user_without_guardian_profile_gets_404(client, order_context):
-    with client.session_transaction() as session_ctx:
-        session_ctx["_user_id"] = str(order_context["outsider_id"])
-        session_ctx["_fresh"] = True
+def test_user_without_guardian_profile_gets_404(client, app, order_context):
+    force_login(client, app, order_context["outsider_id"])
 
     response = client.get(f"/pago/{order_context['order_id']}")
     assert response.status_code == 404
