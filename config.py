@@ -10,6 +10,8 @@ def _env_bool(key: str, default: bool = False) -> bool:
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+_DEFAULT_PRODUCTION = os.environ.get("FLASK_ENV") == "production"
+
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
@@ -54,7 +56,16 @@ class Config:
     GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI")
     GOOGLE_HTTP_TIMEOUT = int(os.environ.get("GOOGLE_HTTP_TIMEOUT", 10))
 
-    SESSION_COOKIE_DOMAIN = ".ajedrezrecreativo.cl"
+    SESSION_COOKIE_DOMAIN = os.environ.get(
+        "SESSION_COOKIE_DOMAIN", ".ajedrezrecreativo.cl"
+    )
+    SESSION_COOKIE_SECURE = _env_bool(
+        "SESSION_COOKIE_SECURE", _DEFAULT_PRODUCTION
+    )
+    SESSION_COOKIE_SAMESITE = os.environ.get(
+        "SESSION_COOKIE_SAMESITE",
+        "None" if SESSION_COOKIE_SECURE else "Lax",
+    )
 
     # Tokens
     INITIAL_PASSWORD_TOKEN_SALT = os.environ.get(
